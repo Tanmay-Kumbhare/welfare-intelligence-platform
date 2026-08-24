@@ -1,0 +1,292 @@
+﻿{
+  "schemes": [
+    {
+      "scheme_name": "PM Kisan Samman Nidhi (PM-KISAN)",
+      "department_name": "Ministry of Agriculture & Farmers Welfare",
+      "scheme_category": "AGRICULTURE",
+      "description": "Income support to small and marginal farmer families across India",
+      "benefit_description": "₹6,000 per year in three equal installments of ₹2,000 directly to the bank account",
+      "start_date": "2019-02-24",
+      "status": "ACTIVE",
+      "official_source_url": "https://pmkisan.gov.in",
+      "application_url": "https://pmkisan.gov.in/RegistrationForm.aspx",
+      "last_verified_at": "2024-01-01",
+      "group_combining_operator": "AND",
+      "rule_groups": [
+        {
+          "group_name": "Farmer Classification",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "citizen_type",
+              "operator": "==",
+              "required_value": "FARMER",
+              "rule_description": "Must be a registered farmer",
+              "rule_priority": 1
+            },
+            {
+              "parameter_name": "land_holding_size",
+              "operator": "<=",
+              "required_value": "2.0",
+              "rule_description": "Land holding must not exceed 2 hectares",
+              "rule_priority": 2
+            }
+          ]
+        },
+        {
+          "group_name": "Exclusion Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "is_income_tax_payer",
+              "operator": "==",
+              "required_value": "false",
+              "rule_description": "Income tax payers are excluded",
+              "rule_priority": 1
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {"document_type": "AADHAAR", "mandatory_flag": true, "description": "Identity verification"},
+        {"document_type": "LAND_RECORD", "mandatory_flag": true, "description": "Proof of land holding"},
+        {"document_type": "BANK_PASSBOOK", "mandatory_flag": true, "description": "DBT-linked bank account"}
+      ]
+    },
+    {
+      "scheme_name": "PM Awas Yojana Gramin (PMAY-G)",
+      "department_name": "Ministry of Rural Development",
+      "scheme_category": "HOUSING",
+      "description": "Housing for all in rural areas",
+      "benefit_description": "Financial assistance of ₹1.20 lakh in plain areas and ₹1.30 lakh in hilly areas for pucca house construction",
+      "status": "ACTIVE",
+      "official_source_url": "https://pmayg.nic.in",
+      "group_combining_operator": "AND",
+      "rule_groups": [
+        {
+          "group_name": "Economic & Area Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "poverty_category",
+              "operator": "IN",
+              "required_value": "BPL,AAY",
+              "rule_description": "Must belong to BPL or AAY category",
+              "rule_priority": 1
+            },
+            {
+              "parameter_name": "area_type",
+              "operator": "==",
+              "required_value": "RURAL",
+              "rule_description": "Must be a resident of a rural area",
+              "rule_priority": 2
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {"document_type": "AADHAAR", "mandatory_flag": true},
+        {"document_type": "BANK_PASSBOOK", "mandatory_flag": true},
+        {"document_type": "BPL_CARD", "mandatory_flag": true}
+      ]
+    },
+    {
+      "scheme_name": "NSP Post-Matric Scholarship for SC Students",
+      "department_name": "Ministry of Social Justice and Empowerment",
+      "scheme_category": "EDUCATION",
+      "description": "Financial assistance to Scheduled Caste students at post-matriculation stage",
+      "benefit_description": "Covers compulsory non-refundable fees and provides a maintenance allowance",
+      "status": "ACTIVE",
+      "official_source_url": "https://scholarships.gov.in",
+      "group_combining_operator": "AND",
+      "rule_groups": [
+        {
+          "group_name": "Academic & Category Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "SC",
+              "rule_description": "Must belong to Scheduled Caste category",
+              "rule_priority": 1
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "SECONDARY,HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be enrolled in post-matriculation courses",
+              "rule_priority": 2
+            },
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "250000",
+              "rule_description": "Family annual income must not exceed ₹2,50,000",
+              "rule_priority": 3
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {"document_type": "AADHAAR", "mandatory_flag": true},
+        {"document_type": "CASTE_CERTIFICATE", "mandatory_flag": true},
+        {"document_type": "INCOME_CERTIFICATE", "mandatory_flag": true},
+        {"document_type": "MARKSHEET", "mandatory_flag": true}
+      ]
+    },
+    {
+      "scheme_name": "Indira Gandhi National Old Age Pension (IGNOAPS)",
+      "department_name": "Ministry of Rural Development",
+      "scheme_category": "PENSION",
+      "description": "Pension for senior citizens below the poverty line",
+      "benefit_description": "₹200 per month (60-79 years) or ₹500 per month (80+ years)",
+      "status": "ACTIVE",
+      "official_source_url": "https://nsap.nic.in",
+      "group_combining_operator": "AND",
+      "rule_groups": [
+        {
+          "group_name": "Age & Poverty Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "age",
+              "operator": ">=",
+              "required_value": "60",
+              "rule_description": "Must be 60 years or older",
+              "rule_priority": 1
+            },
+            {
+              "parameter_name": "poverty_category",
+              "operator": "IN",
+              "required_value": "BPL,AAY",
+              "rule_description": "Must belong to BPL or AAY category",
+              "rule_priority": 2
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {"document_type": "AADHAAR", "mandatory_flag": true},
+        {"document_type": "BPL_CARD", "mandatory_flag": true}
+      ]
+    },
+    {
+      "scheme_name": "PM Ujjwala Yojana 2.0 (PMUY)",
+      "department_name": "Ministry of Petroleum and Natural Gas",
+      "scheme_category": "ENERGY",
+      "description": "Deposit-free LPG connections to women from below poverty line households",
+      "benefit_description": "Free LPG connection with first refill and hotplate provided free of cost",
+      "status": "ACTIVE",
+      "official_source_url": "https://pmuy.gov.in",
+      "group_combining_operator": "AND",
+      "rule_groups": [
+        {
+          "group_name": "Gender & Poverty Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "gender",
+              "operator": "==",
+              "required_value": "FEMALE",
+              "rule_description": "Applicant must be female",
+              "rule_priority": 1
+            },
+            {
+              "parameter_name": "age",
+              "operator": ">=",
+              "required_value": "18",
+              "rule_description": "Must be 18 years or older",
+              "rule_priority": 2
+            },
+            {
+              "parameter_name": "poverty_category",
+              "operator": "IN",
+              "required_value": "BPL,AAY",
+              "rule_description": "Must belong to poor household (BPL/AAY)",
+              "rule_priority": 3
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {"document_type": "AADHAAR", "mandatory_flag": true},
+        {"document_type": "BPL_CARD", "mandatory_flag": true},
+        {"document_type": "RATION_CARD", "mandatory_flag": true}
+      ]
+    },
+    {
+      "scheme_name": "Ayushman Bharat PM-JAY",
+      "department_name": "National Health Authority",
+      "scheme_category": "HEALTHCARE",
+      "description": "Health insurance for poor and vulnerable families",
+      "benefit_description": "Health cover of ₹5 lakh per family per year for secondary and tertiary care hospitalization",
+      "status": "ACTIVE",
+      "official_source_url": "https://pmjay.gov.in",
+      "group_combining_operator": "AND",
+      "rule_groups": [
+        {
+          "group_name": "Economic Vulnerability",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "poverty_category",
+              "operator": "IN",
+              "required_value": "BPL,AAY",
+              "rule_description": "Proxy for SECC 2011 deprivation criteria",
+              "rule_priority": 1
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {"document_type": "AADHAAR", "mandatory_flag": true},
+        {"document_type": "RATION_CARD", "mandatory_flag": true}
+      ]
+    },
+    {
+      "scheme_name": "PM SVANidhi",
+      "department_name": "Ministry of Housing and Urban Affairs",
+      "scheme_category": "EMPLOYMENT",
+      "description": "Micro-credit facility for street vendors",
+      "benefit_description": "Collateral-free working capital loan up to ₹10,000, with incentives for digital transactions",
+      "status": "ACTIVE",
+      "official_source_url": "https://pmsvanidhi.mohua.gov.in",
+      "group_combining_operator": "AND",
+      "rule_groups": [
+        {
+          "group_name": "Occupation Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "employment_status",
+              "operator": "==",
+              "required_value": "SELF_EMPLOYED",
+              "rule_description": "Must be self-employed (proxy for street vendor)",
+              "rule_priority": 1
+            },
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "200000",
+              "rule_description": "Income limit typical for microcredit targets",
+              "rule_priority": 2
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {"document_type": "AADHAAR", "mandatory_flag": true},
+        {"document_type": "BANK_PASSBOOK", "mandatory_flag": true}
+      ]
+    }
+  ]
+}

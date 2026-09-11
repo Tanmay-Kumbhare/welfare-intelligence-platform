@@ -1,4 +1,4 @@
-﻿"""
+"""
 Scheme domain ORM models.
 
 Tables:
@@ -44,6 +44,8 @@ class SchemeMaster(Base):
     last_verified_at: Mapped[date | None] = mapped_column(Date)
     # AND | OR — how the scheme''s rule groups are combined
     group_combining_operator: Mapped[str] = mapped_column(String(5), default="AND")
+    # FARMER | STUDENT | SENIOR | GENERAL — persona tag for filtered discovery
+    target_persona: Mapped[str | None] = mapped_column(String(50), index=True)
 
     # Relationships
     rule_groups: Mapped[list["SchemeRuleGroup"]] = relationship(
@@ -122,6 +124,10 @@ class SchemeEligibilityRule(Base):
     # Human-readable explanation shown to citizen in evaluation details
     rule_description: Mapped[str | None] = mapped_column(Text)
     rule_priority: Mapped[int] = mapped_column(Integer, default=1)
+    # Diagnostic stage code: S0_ELIGIBILITY | S1_DOCUMENT_DISCREPANCY | S2_DOMICILE_MISMATCH
+    failure_stage_code: Mapped[str | None] = mapped_column(String(50))
+    # Actionable remediation template shown to citizen on failure
+    remedy_template: Mapped[str | None] = mapped_column(Text)
 
     scheme: Mapped["SchemeMaster"] = relationship(back_populates="eligibility_rules")
     group: Mapped["SchemeRuleGroup"] = relationship(back_populates="rules")

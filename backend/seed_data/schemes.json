@@ -1,17 +1,18 @@
-﻿{
+{
   "schemes": [
     {
       "scheme_name": "PM Kisan Samman Nidhi (PM-KISAN)",
       "department_name": "Ministry of Agriculture & Farmers Welfare",
       "scheme_category": "AGRICULTURE",
       "description": "Income support to small and marginal farmer families across India",
-      "benefit_description": "₹6,000 per year in three equal installments of ₹2,000 directly to the bank account",
+      "benefit_description": "Rs.6,000 per year in three equal installments of Rs.2,000 directly to the bank account",
       "start_date": "2019-02-24",
       "status": "ACTIVE",
       "official_source_url": "https://pmkisan.gov.in",
       "application_url": "https://pmkisan.gov.in/RegistrationForm.aspx",
       "last_verified_at": "2024-01-01",
       "group_combining_operator": "AND",
+      "target_persona": "FARMER",
       "rule_groups": [
         {
           "group_name": "Farmer Classification",
@@ -23,14 +24,18 @@
               "operator": "==",
               "required_value": "FARMER",
               "rule_description": "Must be a registered farmer",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Register as a farmer at your nearest Tehsildar office or Common Service Centre (CSC)."
             },
             {
               "parameter_name": "land_holding_size",
               "operator": "<=",
               "required_value": "2.0",
               "rule_description": "Land holding must not exceed 2 hectares",
-              "rule_priority": 2
+              "rule_priority": 2,
+              "failure_stage_code": "S1_DOCUMENT_DISCREPANCY",
+              "remedy_template": "Verify your land records at the local Patwari / Tehsildar office. If land was recently partitioned, update the mutation entry."
             }
           ]
         },
@@ -44,7 +49,9 @@
               "operator": "==",
               "required_value": "false",
               "rule_description": "Income tax payers are excluded",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Income tax payers are excluded from PM-KISAN by policy. No remediation is available."
             }
           ]
         }
@@ -60,10 +67,11 @@
       "department_name": "Ministry of Rural Development",
       "scheme_category": "HOUSING",
       "description": "Housing for all in rural areas",
-      "benefit_description": "Financial assistance of ₹1.20 lakh in plain areas and ₹1.30 lakh in hilly areas for pucca house construction",
+      "benefit_description": "Financial assistance of Rs.1.20 lakh in plain areas and Rs.1.30 lakh in hilly areas for pucca house construction",
       "status": "ACTIVE",
       "official_source_url": "https://pmayg.nic.in",
       "group_combining_operator": "AND",
+      "target_persona": "GENERAL",
       "rule_groups": [
         {
           "group_name": "Economic & Area Criteria",
@@ -75,14 +83,18 @@
               "operator": "IN",
               "required_value": "BPL,AAY",
               "rule_description": "Must belong to BPL or AAY category",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Apply for a BPL certificate at the District Collector office or through your Gram Panchayat."
             },
             {
               "parameter_name": "area_type",
               "operator": "==",
               "required_value": "RURAL",
               "rule_description": "Must be a resident of a rural area",
-              "rule_priority": 2
+              "rule_priority": 2,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "This scheme is available only in rural areas. Urban residents may apply for PMAY-Urban instead at https://pmaymis.gov.in."
             }
           ]
         }
@@ -102,6 +114,7 @@
       "status": "ACTIVE",
       "official_source_url": "https://scholarships.gov.in",
       "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
       "rule_groups": [
         {
           "group_name": "Academic & Category Criteria",
@@ -113,21 +126,27 @@
               "operator": "==",
               "required_value": "SC",
               "rule_description": "Must belong to Scheduled Caste category",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S1_DOCUMENT_DISCREPANCY",
+              "remedy_template": "Obtain a valid caste certificate from the Sub-Divisional Magistrate (SDM) or District Magistrate office."
             },
             {
               "parameter_name": "education_level",
               "operator": "IN",
               "required_value": "SECONDARY,HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
               "rule_description": "Must be enrolled in post-matriculation courses",
-              "rule_priority": 2
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for post-matric students only. Complete your Class 10 and enrol in a recognized institution."
             },
             {
               "parameter_name": "annual_income",
               "operator": "<=",
               "required_value": "250000",
-              "rule_description": "Family annual income must not exceed ₹2,50,000",
-              "rule_priority": 3
+              "rule_description": "Family annual income must not exceed Rs.2,50,000",
+              "rule_priority": 3,
+              "failure_stage_code": "S1_DOCUMENT_DISCREPANCY",
+              "remedy_template": "Obtain an updated income certificate from the Tehsildar reflecting current family income."
             }
           ]
         }
@@ -144,10 +163,11 @@
       "department_name": "Ministry of Rural Development",
       "scheme_category": "PENSION",
       "description": "Pension for senior citizens below the poverty line",
-      "benefit_description": "₹200 per month (60-79 years) or ₹500 per month (80+ years)",
+      "benefit_description": "Rs.200 per month (60-79 years) or Rs.500 per month (80+ years)",
       "status": "ACTIVE",
       "official_source_url": "https://nsap.nic.in",
       "group_combining_operator": "AND",
+      "target_persona": "SENIOR",
       "rule_groups": [
         {
           "group_name": "Age & Poverty Criteria",
@@ -159,14 +179,18 @@
               "operator": ">=",
               "required_value": "60",
               "rule_description": "Must be 60 years or older",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scheme is for citizens aged 60 and above. You do not currently meet the minimum age requirement."
             },
             {
               "parameter_name": "poverty_category",
               "operator": "IN",
               "required_value": "BPL,AAY",
               "rule_description": "Must belong to BPL or AAY category",
-              "rule_priority": 2
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Apply for a BPL certificate at the District Collector office or through your Gram Panchayat."
             }
           ]
         }
@@ -185,6 +209,7 @@
       "status": "ACTIVE",
       "official_source_url": "https://pmuy.gov.in",
       "group_combining_operator": "AND",
+      "target_persona": "GENERAL",
       "rule_groups": [
         {
           "group_name": "Gender & Poverty Criteria",
@@ -196,21 +221,27 @@
               "operator": "==",
               "required_value": "FEMALE",
               "rule_description": "Applicant must be female",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scheme is exclusively for female applicants. A female family member may apply instead."
             },
             {
               "parameter_name": "age",
               "operator": ">=",
               "required_value": "18",
               "rule_description": "Must be 18 years or older",
-              "rule_priority": 2
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Applicant must be at least 18 years old."
             },
             {
               "parameter_name": "poverty_category",
               "operator": "IN",
               "required_value": "BPL,AAY",
               "rule_description": "Must belong to poor household (BPL/AAY)",
-              "rule_priority": 3
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Apply for a BPL certificate at the District Collector office or through your Gram Panchayat."
             }
           ]
         }
@@ -226,10 +257,11 @@
       "department_name": "National Health Authority",
       "scheme_category": "HEALTHCARE",
       "description": "Health insurance for poor and vulnerable families",
-      "benefit_description": "Health cover of ₹5 lakh per family per year for secondary and tertiary care hospitalization",
+      "benefit_description": "Health cover of Rs.5 lakh per family per year for secondary and tertiary care hospitalization",
       "status": "ACTIVE",
       "official_source_url": "https://pmjay.gov.in",
       "group_combining_operator": "AND",
+      "target_persona": "GENERAL",
       "rule_groups": [
         {
           "group_name": "Economic Vulnerability",
@@ -241,7 +273,9 @@
               "operator": "IN",
               "required_value": "BPL,AAY",
               "rule_description": "Proxy for SECC 2011 deprivation criteria",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Check your eligibility on the Ayushman Bharat portal at https://pmjay.gov.in/am-i-eligible or contact 14555."
             }
           ]
         }
@@ -256,10 +290,11 @@
       "department_name": "Ministry of Housing and Urban Affairs",
       "scheme_category": "EMPLOYMENT",
       "description": "Micro-credit facility for street vendors",
-      "benefit_description": "Collateral-free working capital loan up to ₹10,000, with incentives for digital transactions",
+      "benefit_description": "Collateral-free working capital loan up to Rs.10,000, with incentives for digital transactions",
       "status": "ACTIVE",
       "official_source_url": "https://pmsvanidhi.mohua.gov.in",
       "group_combining_operator": "AND",
+      "target_persona": "GENERAL",
       "rule_groups": [
         {
           "group_name": "Occupation Criteria",
@@ -271,14 +306,18 @@
               "operator": "==",
               "required_value": "SELF_EMPLOYED",
               "rule_description": "Must be self-employed (proxy for street vendor)",
-              "rule_priority": 1
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain a Certificate of Vending (CoV) or Letter of Recommendation from the Urban Local Body (ULB)."
             },
             {
               "parameter_name": "annual_income",
               "operator": "<=",
               "required_value": "200000",
               "rule_description": "Income limit typical for microcredit targets",
-              "rule_priority": 2
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Your income exceeds the threshold for this micro-credit scheme."
             }
           ]
         }

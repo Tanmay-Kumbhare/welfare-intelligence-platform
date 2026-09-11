@@ -1,26 +1,75 @@
-﻿import { User, Tractor, GraduationCap, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  GraduationCap,
+  Tractor,
+  Users,
+  HardHat,
+  Venus,
+  Accessibility,
+  Trees,
+  Home as HomeIcon,
+  User,
+} from "lucide-react";
+import { countSchemesByCitizenType, countSchemesByLens } from "../../utils/schemeInsights";
 
-export default function CitizenTypeSelector({ onSelect }) {
-  const types = [
-    { id: "FARMER", name: "Farmer", icon: Tractor, desc: "Agriculture and allied activities" },
-    { id: "STUDENT", name: "Student", icon: GraduationCap, desc: "School, college or university" },
-    { id: "SENIOR", name: "Senior Citizen", icon: Users, desc: "60 years and above" },
-    { id: "GENERAL", name: "General Citizen", icon: User, desc: "Employed, self-employed or other" },
-  ];
+// "profile" entries map directly to the real backend citizen_type column
+// (FARMER | STUDENT | SENIOR | GENERAL) -- selecting one starts the actual
+// eligibility profile with that type pre-selected.
+//
+// "lens" entries do NOT correspond to any backend citizen_type. They are
+// discovery filters over real eligibility-rule parameters already stored
+// in the database (Part 3/6: "treat it as an exploration/filter category
+// only"). Selecting one takes the citizen to Explore, pre-filtered by
+// that parameter -- never a fabricated eligibility outcome.
+const CITIZEN_TYPES = [
+  { kind: "profile", value: "STUDENT", label: "Student", icon: GraduationCap, blurb: "Education & course-based schemes" },
+  { kind: "profile", value: "FARMER", label: "Farmer", icon: Tractor, blurb: "Land holding & agriculture schemes" },
+  { kind: "profile", value: "SENIOR", label: "Senior Citizen", icon: Users, blurb: "Age & pension-based schemes" },
+  { kind: "lens", value: "employment_status", label: "Worker / Labour", icon: HardHat, blurb: "Schemes that consider employment status" },
+  { kind: "lens", value: "gender", label: "Women", icon: Venus, blurb: "Schemes that consider gender" },
+  { kind: "lens", value: "disability_status", label: "PwD", icon: Accessibility, blurb: "Schemes that consider disability status" },
+  { kind: "lens", value: "social_category", label: "Tribal / Indigenous", icon: Trees, blurb: "Schemes that consider social category" },
+  { kind: "lens", value: "area_type", label: "Rural Household", icon: HomeIcon, blurb: "Schemes that consider area type" },
+  { kind: "profile", value: "GENERAL", label: "General Citizen", icon: User, blurb: "Income & category-based schemes" },
+];
+
+export default function CitizenTypeSelector({ schemesWithRules }) {
+  const navigate = useNavigate();
+
+  const handleSelect = (type) => {
+    if (type.kind === "profile") {
+      navigate(`/check-eligibility?citizenType=${type.value}`);
+    } else {
+      navigate(`/explore?lens=${type.value}`);
+    }
+  };
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-      {types.map((t) => {
-        const Icon = t.icon;
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {CITIZEN_TYPES.map((type) => {
+        const Icon = type.icon;
+        const count = schemesWithRules
+          ? type.kind === "profile"
+            ? countSchemesByCitizenType(schemesWithRules, type.value)
+            : countSchemesByLens(schemesWithRules, type.value)
+          : null;
+
         return (
           <button
-            key={t.id}
-            onClick={() => onSelect(t.id)}
-            className="flex flex-col items-center p-8 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            key={type.value}
+            onClick={() => handleSelect(type)}
+            className="text-left bg-paper-raised border border-line p-4 hover:border-accent transition-colors focus-visible:outline-none group"
           >
-            <Icon className="w-12 h-12 text-blue-600 mb-4" />
-            <h3 className="text-xl font-medium text-gray-900">{t.name}</h3>
-            <p className="mt-2 text-sm text-gray-500 text-center">{t.desc}</p>
+            <Icon className="h-5 w-5 text-accent-ink mb-2" />
+            <h3 className="text-sm mb-1">{type.label}</h3>
+            <p className="text-xs text-ink-soft mb-0 leading-snug">{type.blurb}</p>
+            {schemesWithRules && (
+              <p className="text-xs mt-2 mb-0 font-mono text-ink-soft">
+                {count > 0
+                  ? `${count} rule-matched scheme${count === 1 ? "" : "s"}`
+                  : "No matching rules"}
+              </p>
+            )}
           </button>
         );
       })}

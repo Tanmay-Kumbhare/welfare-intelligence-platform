@@ -1,7 +1,56 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
+
+@theme {
+  /* Typography -- matches the faculty VidyaSetu mockup exactly */
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-sans: "IBM Plex Sans", Arial, ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+
+  /* Palette -- lifted directly from vidyasetu_ui_mockup.html :root tokens */
+  --color-paper: #f6f2e7;
+  --color-paper-raised: #ffffff;
+  --color-ink: #16233d;
+  --color-ink-soft: #4a5468;
+  --color-line: #d8d2c2;
+
+  --color-accent: #b5772a;
+  --color-accent-ink: #5c3b15;
+  --color-accent-tint: #f0e1cb;
+
+  --color-ok: #2f6b4f;
+  --color-ok-tint: #e4efe9;
+  --color-ok-ink: #1e4633;
+
+  --color-excl: #8b3a3a;
+  --color-excl-tint: #f3e4e2;
+  --color-excl-ink: #5b2424;
+}
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-paper text-ink font-sans antialiased;
+    line-height: 1.6;
+  }
+  h1, h2 {
+    @apply font-display font-semibold text-ink;
+  }
+  h3 {
+    @apply font-sans font-semibold text-ink;
+  }
+  p {
+    @apply text-ink-soft;
+  }
+  a {
+    color: var(--color-accent-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }

@@ -1,0 +1,3380 @@
+{
+  "forms": [
+    {
+      "form_code": "GENERAL_CITIZEN_PROFILE",
+      "form_name": "General Citizen Profile",
+      "description": "Development seed: general citizen profile form v1 for the dynamic form system.",
+      "target_citizen_type": "GENERAL",
+      "version": 1,
+      "status": "ACTIVE",
+      "sections": [
+        {
+          "section_code": "PERSONAL_INFO",
+          "section_name": "Personal Information",
+          "display_order": 1,
+          "questions": [
+            {
+              "question_code": "FULL_NAME",
+              "question_text": "What is your full name?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "full_name"
+            },
+            {
+              "question_code": "DATE_OF_BIRTH",
+              "question_text": "What is your date of birth?",
+              "question_type": "date",
+              "data_type": "DATE",
+              "required": true,
+              "display_order": 2,
+              "profile_field": "date_of_birth"
+            },
+            {
+              "question_code": "GENDER",
+              "question_text": "What is your gender?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "gender",
+              "options": [
+                {
+                  "option_code": "MALE",
+                  "option_label": "Male",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "FEMALE",
+                  "option_label": "Female",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 3
+                }
+              ]
+            },
+            {
+              "question_code": "MOBILE_NUMBER",
+              "question_text": "What is your mobile number?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "mobile_number",
+              "validation_rule": {
+                "pattern": "^[0-9]{10}$"
+              }
+            }
+          ]
+        },
+        {
+          "section_code": "FAMILY_INFO",
+          "section_name": "Family Information",
+          "display_order": 2,
+          "questions": [
+            {
+              "question_code": "FAMILY_SIZE",
+              "question_text": "How many members are there in your family?",
+              "question_type": "number",
+              "data_type": "INTEGER",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "family_size",
+              "validation_rule": {
+                "min": 1,
+                "max": 30
+              }
+            },
+            {
+              "question_code": "CURRENTLY_STUDYING",
+              "question_text": "Are you currently studying?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": true,
+              "display_order": 2,
+              "profile_field": "currently_studying",
+              "options": [
+                {
+                  "option_code": "YES",
+                  "option_label": "Yes",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "NO",
+                  "option_label": "No",
+                  "display_order": 2
+                }
+              ]
+            },
+            {
+              "question_code": "STUDYING_COURSE",
+              "question_text": "Which course are you studying?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "course_name",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "EDUCATION_EMPLOYMENT",
+          "section_name": "Education / Employment",
+          "display_order": 3,
+          "questions": [
+            {
+              "question_code": "EDUCATION_LEVEL",
+              "question_text": "What is your highest education level?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "education_level",
+              "options": [
+                {
+                  "option_code": "ILLITERATE",
+                  "option_label": "Illiterate",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PRIMARY",
+                  "option_label": "Primary",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SECONDARY",
+                  "option_label": "Secondary",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "HIGHER_SECONDARY",
+                  "option_label": "Higher Secondary",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "GRADUATE",
+                  "option_label": "Graduate",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "POST_GRADUATE",
+                  "option_label": "Post Graduate",
+                  "display_order": 6
+                }
+              ]
+            },
+            {
+              "question_code": "EMPLOYMENT_STATUS",
+              "question_text": "What is your employment status?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "employment_status",
+              "options": [
+                {
+                  "option_code": "EMPLOYED",
+                  "option_label": "Employed",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "UNEMPLOYED",
+                  "option_label": "Unemployed",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SELF_EMPLOYED",
+                  "option_label": "Self Employed",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "STUDENT",
+                  "option_label": "Student",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "RETIRED",
+                  "option_label": "Retired",
+                  "display_order": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "FINANCIAL_INFO",
+          "section_name": "Financial Information",
+          "display_order": 4,
+          "questions": [
+            {
+              "question_code": "ANNUAL_INCOME",
+              "question_text": "What is your family's annual income (in rupees)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "annual_income",
+              "validation_rule": {
+                "min": 0
+              }
+            },
+            {
+              "question_code": "POVERTY_CATEGORY",
+              "question_text": "Do you hold a BPL or AAY card?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "poverty_category",
+              "options": [
+                {
+                  "option_code": "APL",
+                  "option_label": "APL (Above Poverty Line)",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "BPL",
+                  "option_label": "BPL (Below Poverty Line)",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "AAY",
+                  "option_label": "AAY (Antyodaya)",
+                  "display_order": 3
+                }
+              ]
+            },
+            {
+              "question_code": "IS_BPL_CARD_HOLDER",
+              "question_text": "Do you possess a BPL card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "is_bpl_card_holder"
+            }
+          ]
+        },
+        {
+          "section_code": "SOCIAL_INFO",
+          "section_name": "Social Information",
+          "display_order": 5,
+          "questions": [
+            {
+              "question_code": "SOCIAL_CATEGORY",
+              "question_text": "What is your social category?",
+              "question_type": "single_choice",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "social_category",
+              "options": [
+                {
+                  "option_code": "GEN",
+                  "option_label": "General",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "OBC",
+                  "option_label": "OBC",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SC",
+                  "option_label": "SC",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "ST",
+                  "option_label": "ST",
+                  "display_order": 4
+                }
+              ]
+            },
+            {
+              "question_code": "DISABILITY_STATUS",
+              "question_text": "Do you have any disability?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "disability_status",
+              "options": [
+                {
+                  "option_code": "NONE",
+                  "option_label": "None",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PHYSICALLY_DISABLED",
+                  "option_label": "Physically Disabled",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "VISUALLY_IMPAIRED",
+                  "option_label": "Visually Impaired",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "HEARING_IMPAIRED",
+                  "option_label": "Hearing Impaired",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "LOCATION_INFO",
+          "section_name": "Location",
+          "display_order": 6,
+          "questions": [
+            {
+              "question_code": "STATE",
+              "question_text": "Which state do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "state"
+            },
+            {
+              "question_code": "DISTRICT",
+              "question_text": "Which district do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 2,
+              "profile_field": "district"
+            },
+            {
+              "question_code": "AREA_TYPE",
+              "question_text": "Is your area rural or urban?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "area_type",
+              "options": [
+                {
+                  "option_code": "RURAL",
+                  "option_label": "Rural",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "URBAN",
+                  "option_label": "Urban",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SEMI_URBAN",
+                  "option_label": "Semi-Urban",
+                  "display_order": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "DOCUMENTS",
+          "section_name": "Documents",
+          "display_order": 7,
+          "questions": [
+            {
+              "question_code": "HAS_AADHAAR",
+              "question_text": "Do you have an Aadhaar card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "has_aadhaar"
+            },
+            {
+              "question_code": "INCOME_CERTIFICATE_FILE",
+              "question_text": "Upload your income certificate (if available)",
+              "question_type": "file",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "income_certificate",
+              "help_text": "Accepted formats: PDF, JPG, PNG. Used as DOCUMENT source for income facts."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "form_code": "GENERAL_CITIZEN_PROFILE",
+      "form_name": "Citizen Profile (v2)",
+      "description": "Phase 2C blueprint: full welfare-relevant citizen profile. Common sections for everyone plus conditionally revealed type-specific sections (student, farmer, employed, self-employed, disability). Citizen types are NOT mutually exclusive - applicability is driven by answers and conditions, not citizen_type.",
+      "target_citizen_type": "GENERAL",
+      "version": 2,
+      "status": "ACTIVE",
+      "sections": [
+        {
+          "section_code": "PERSONAL_INFO",
+          "section_name": "Personal Information",
+          "display_order": 1,
+          "questions": [
+            {
+              "question_code": "FULL_NAME",
+              "question_text": "What is your full name as per your documents?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "full_name",
+              "validation_rule": {
+                "max_length": 100
+              }
+            },
+            {
+              "question_code": "DATE_OF_BIRTH",
+              "question_text": "What is your date of birth?",
+              "question_type": "date",
+              "data_type": "DATE",
+              "required": true,
+              "display_order": 2,
+              "profile_field": "date_of_birth",
+              "help_text": "Age is calculated automatically from this - it is never asked separately."
+            },
+            {
+              "question_code": "GENDER",
+              "question_text": "What is your gender?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "gender",
+              "options": [
+                {
+                  "option_code": "MALE",
+                  "option_label": "Male",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "FEMALE",
+                  "option_label": "Female",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 3
+                }
+              ]
+            },
+            {
+              "question_code": "MARITAL_STATUS",
+              "question_text": "What is your marital status?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "marital_status",
+              "options": [
+                {
+                  "option_code": "SINGLE",
+                  "option_label": "Single",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "MARRIED",
+                  "option_label": "Married",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "WIDOWED",
+                  "option_label": "Widowed",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "DIVORCED",
+                  "option_label": "Divorced",
+                  "display_order": 4
+                }
+              ]
+            },
+            {
+              "question_code": "RELIGION",
+              "question_text": "What is your religion?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "religion",
+              "help_text": "Used to determine eligibility for minority welfare schemes.",
+              "options": [
+                {
+                  "option_code": "HINDU",
+                  "option_label": "Hindu",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "MUSLIM",
+                  "option_label": "Muslim",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "CHRISTIAN",
+                  "option_label": "Christian",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "SIKH",
+                  "option_label": "Sikh",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "BUDDHIST",
+                  "option_label": "Buddhist",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "JAIN",
+                  "option_label": "Jain",
+                  "display_order": 6
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 7
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "CONTACT_INFO",
+          "section_name": "Contact Information",
+          "display_order": 2,
+          "questions": [
+            {
+              "question_code": "MOBILE_NUMBER",
+              "question_text": "Your mobile number",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "mobile_number",
+              "validation_rule": {
+                "pattern": "^[6-9][0-9]{9}$"
+              },
+              "placeholder": "10-digit mobile number"
+            },
+            {
+              "question_code": "EMAIL_ID",
+              "question_text": "Your email address",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "email_id",
+              "validation_rule": {
+                "email": true
+              }
+            }
+          ]
+        },
+        {
+          "section_code": "FAMILY_INFO",
+          "section_name": "Family / Household",
+          "display_order": 3,
+          "questions": [
+            {
+              "question_code": "FAMILY_SIZE",
+              "question_text": "How many members are there in your family (including you)?",
+              "question_type": "number",
+              "data_type": "INTEGER",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "family_size",
+              "validation_rule": {
+                "min": 1,
+                "max": 30
+              }
+            },
+            {
+              "question_code": "FAMILY_MEMBERS",
+              "question_text": "Add your family members",
+              "question_type": "text",
+              "data_type": "JSON",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "family_members",
+              "help_text": "Repeating block: each member needs a relationship (SELF, SPOUSE, SON, DAUGHTER, FATHER, MOTHER, OTHER) and a name or date of birth.",
+              "placeholder": "[]"
+            }
+          ]
+        },
+        {
+          "section_code": "LOCATION_INFO",
+          "section_name": "Location",
+          "display_order": 4,
+          "questions": [
+            {
+              "question_code": "STATE",
+              "question_text": "Which state do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "state"
+            },
+            {
+              "question_code": "DISTRICT",
+              "question_text": "Which district do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 2,
+              "profile_field": "district"
+            },
+            {
+              "question_code": "VILLAGE_CITY",
+              "question_text": "Which village, town or city do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "village_city"
+            },
+            {
+              "question_code": "PINCODE",
+              "question_text": "What is your PIN code?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "pincode",
+              "validation_rule": {
+                "pattern": "^[1-9][0-9]{5}$"
+              }
+            },
+            {
+              "question_code": "AREA_TYPE",
+              "question_text": "Is your area rural or urban?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "area_type",
+              "options": [
+                {
+                  "option_code": "RURAL",
+                  "option_label": "Rural",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "URBAN",
+                  "option_label": "Urban",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SEMI_URBAN",
+                  "option_label": "Semi-Urban",
+                  "display_order": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "FINANCIAL_INFO",
+          "section_name": "Financial / Economic",
+          "display_order": 5,
+          "questions": [
+            {
+              "question_code": "ANNUAL_INCOME",
+              "question_text": "What is your family's total annual income (in rupees per year)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "annual_income",
+              "validation_rule": {
+                "min": 0
+              },
+              "help_text": "Household income from all sources. Examples: 240000, 2.4 lakh."
+            },
+            {
+              "question_code": "POVERTY_CATEGORY",
+              "question_text": "Which ration card category does your family hold?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "poverty_category",
+              "options": [
+                {
+                  "option_code": "APL",
+                  "option_label": "APL (Above Poverty Line)",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "BPL",
+                  "option_label": "BPL (Below Poverty Line)",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "AAY",
+                  "option_label": "AAY (Antyodaya)",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "No ration card",
+                  "display_order": 4
+                }
+              ],
+              "help_text": "BPL card possession is recorded automatically from this answer."
+            },
+            {
+              "question_code": "INCOME_SOURCE",
+              "question_text": "What is the main source of your family's income?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "income_source",
+              "options": [
+                {
+                  "option_code": "AGRICULTURE",
+                  "option_label": "Agriculture",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "WAGES",
+                  "option_label": "Daily wages",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SALARY",
+                  "option_label": "Salary",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "BUSINESS",
+                  "option_label": "Business",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "PENSION",
+                  "option_label": "Pension",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 6
+                }
+              ]
+            },
+            {
+              "question_code": "IS_INCOME_TAX_PAYER",
+              "question_text": "Does your family pay income tax?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "is_income_tax_payer"
+            }
+          ]
+        },
+        {
+          "section_code": "EDUCATION_INFO",
+          "section_name": "Education",
+          "display_order": 6,
+          "questions": [
+            {
+              "question_code": "CURRENTLY_STUDYING",
+              "question_text": "Are you currently studying?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "currently_studying",
+              "options": [
+                {
+                  "option_code": "YES",
+                  "option_label": "Yes",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "NO",
+                  "option_label": "No",
+                  "display_order": 2
+                }
+              ]
+            },
+            {
+              "question_code": "EDUCATION_LEVEL",
+              "question_text": "What is your highest education level?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "education_level",
+              "options": [
+                {
+                  "option_code": "ILLITERATE",
+                  "option_label": "Illiterate",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PRIMARY",
+                  "option_label": "Primary",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SECONDARY",
+                  "option_label": "Secondary",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "HIGHER_SECONDARY",
+                  "option_label": "Higher Secondary",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "GRADUATE",
+                  "option_label": "Graduate",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "POST_GRADUATE",
+                  "option_label": "Post Graduate",
+                  "display_order": 6
+                }
+              ]
+            },
+            {
+              "question_code": "COURSE_NAME",
+              "question_text": "Which course are you studying?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "course_name",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "YEAR_OF_STUDY",
+              "question_text": "Which year of study are you in?",
+              "question_type": "number",
+              "data_type": "INTEGER",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "year_of_study",
+              "validation_rule": {
+                "min": 1,
+                "max": 10
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "ACADEMIC_YEAR",
+              "question_text": "Current academic year (e.g. 2026-27)",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "academic_year",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "INSTITUTION_NAME",
+              "question_text": "Which institution are you studying at?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "institution_name",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "INSTITUTION_TYPE",
+              "question_text": "What type of institution is it?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "institution_type",
+              "options": [
+                {
+                  "option_code": "GOVERNMENT",
+                  "option_label": "Government",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PRIVATE",
+                  "option_label": "Private",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "AIDED",
+                  "option_label": "Aided",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "MARKS_PERCENTAGE",
+              "question_text": "What was your latest marks percentage?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 8,
+              "profile_field": "marks_percentage",
+              "validation_rule": {
+                "min": 0,
+                "max": 100
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "ANNUAL_FEE",
+              "question_text": "What is your annual course fee (in rupees)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 9,
+              "profile_field": "annual_fee",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HOSTEL_STATUS",
+              "question_text": "Are you a hosteller or a day scholar?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 10,
+              "profile_field": "hostel_status",
+              "options": [
+                {
+                  "option_code": "HOSTELLER",
+                  "option_label": "Hosteller",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "DAY_SCHOLAR",
+                  "option_label": "Day Scholar",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "Not applicable",
+                  "display_order": 3
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "SCHOLARSHIP_CURRENTLY_RECEIVED",
+              "question_text": "Do you currently receive any scholarship?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 11,
+              "profile_field": "scholarship_currently_received",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "EMPLOYMENT_INFO",
+          "section_name": "Employment",
+          "display_order": 7,
+          "questions": [
+            {
+              "question_code": "EMPLOYMENT_STATUS",
+              "question_text": "What is your employment status?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "employment_status",
+              "options": [
+                {
+                  "option_code": "EMPLOYED",
+                  "option_label": "Employed",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "UNEMPLOYED",
+                  "option_label": "Unemployed",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SELF_EMPLOYED",
+                  "option_label": "Self Employed",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "STUDENT",
+                  "option_label": "Student",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "RETIRED",
+                  "option_label": "Retired",
+                  "display_order": 5
+                }
+              ]
+            },
+            {
+              "question_code": "OCCUPATION",
+              "question_text": "What is your occupation?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "occupation",
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "IN",
+                  "comparison_value": "EMPLOYED,SELF_EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "EMPLOYMENT_TYPE",
+              "question_text": "What type of employment do you have?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "employment_type",
+              "options": [
+                {
+                  "option_code": "PERMANENT",
+                  "option_label": "Permanent",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "CONTRACT",
+                  "option_label": "Contract",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "CASUAL",
+                  "option_label": "Casual",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "EQUALS",
+                  "comparison_value": "EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "EMPLOYER_TYPE",
+              "question_text": "What type of employer do you work for?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "employer_type",
+              "options": [
+                {
+                  "option_code": "GOVERNMENT",
+                  "option_label": "Government",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PRIVATE",
+                  "option_label": "Private",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "COOPERATIVE",
+                  "option_label": "Cooperative",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NGO",
+                  "option_label": "NGO",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "HOUSEHOLD",
+                  "option_label": "Household",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 6
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "EQUALS",
+                  "comparison_value": "EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "EMPLOYER_NAME",
+              "question_text": "What is the name of your employer?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "employer_name",
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "EQUALS",
+                  "comparison_value": "EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "MONTHLY_INCOME",
+              "question_text": "What is your monthly personal income (in rupees)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "monthly_income",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "IN",
+                  "comparison_value": "EMPLOYED,SELF_EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "WORK_SECTOR",
+              "question_text": "Do you work in the formal or informal sector?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "work_sector",
+              "options": [
+                {
+                  "option_code": "FORMAL",
+                  "option_label": "Formal",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "INFORMAL",
+                  "option_label": "Informal",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "AGRICULTURE",
+                  "option_label": "Agriculture",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "IN",
+                  "comparison_value": "EMPLOYED,SELF_EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "AGRICULTURE_INFO",
+          "section_name": "Agriculture",
+          "display_order": 8,
+          "questions": [
+            {
+              "question_code": "FARMER_STATUS",
+              "question_text": "Are you engaged in farming?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "farmer_status",
+              "options": [
+                {
+                  "option_code": "YES",
+                  "option_label": "Yes",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "NO",
+                  "option_label": "No",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "MARGINAL",
+                  "option_label": "Yes - marginal farmer",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "SMALL",
+                  "option_label": "Yes - small farmer",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 5
+                }
+              ]
+            },
+            {
+              "question_code": "FARMER_TYPE",
+              "question_text": "Are you an owner, tenant, or sharecropper?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "farmer_type",
+              "options": [
+                {
+                  "option_code": "OWNER",
+                  "option_label": "Owner",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "TENANT",
+                  "option_label": "Tenant",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SHARECROPPER",
+                  "option_label": "Sharecropper",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "LAND_OWNERSHIP_STATUS",
+              "question_text": "Is your land owned, leased, or both?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "land_ownership_status",
+              "options": [
+                {
+                  "option_code": "OWNED",
+                  "option_label": "Owned",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "LEASED",
+                  "option_label": "Leased",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "BOTH",
+                  "option_label": "Both",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "None",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "TOTAL_LAND_AREA",
+              "question_text": "What is your total land area?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "total_land_area",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "LAND_UNIT",
+              "question_text": "Which unit is your land area measured in?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "land_unit",
+              "options": [
+                {
+                  "option_code": "HECTARE",
+                  "option_label": "Hectare",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "ACRE",
+                  "option_label": "Acre",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "BIGHA",
+                  "option_label": "Bigha",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "GUNTHA",
+                  "option_label": "Guntha",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "CULTIVATED_AREA",
+              "question_text": "How much land do you cultivate?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "cultivated_land_area",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "IRRIGATED_AREA",
+              "question_text": "How much of your land is irrigated?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "irrigated_land_area",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "CROP_TYPE",
+              "question_text": "Which crops do you mainly grow?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 8,
+              "profile_field": "crop_type",
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "AGRICULTURAL_INCOME",
+              "question_text": "What is your annual agricultural income (in rupees)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 9,
+              "profile_field": "agricultural_income",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_KCC",
+              "question_text": "Do you have a Kisan Credit Card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 10,
+              "profile_field": "has_kcc",
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "DISABILITY_INFO",
+          "section_name": "Disability / Special Circumstances",
+          "display_order": 9,
+          "questions": [
+            {
+              "question_code": "HAS_DISABILITY",
+              "question_text": "Do you have a disability?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "has_disability",
+              "options": [
+                {
+                  "option_code": "YES",
+                  "option_label": "Yes",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "NO",
+                  "option_label": "No",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "PENDING",
+                  "option_label": "Under assessment",
+                  "display_order": 3
+                }
+              ]
+            },
+            {
+              "question_code": "DISABILITY_TYPE",
+              "question_text": "What type of disability do you have?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "disability_type",
+              "options": [
+                {
+                  "option_code": "PHYSICAL",
+                  "option_label": "Physical",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "VISUAL",
+                  "option_label": "Visual",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "HEARING",
+                  "option_label": "Hearing",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "INTELLECTUAL",
+                  "option_label": "Intellectual",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "MULTIPLE",
+                  "option_label": "Multiple",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 6
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "HAS_DISABILITY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "DISABILITY_PERCENTAGE",
+              "question_text": "What is your certified disability percentage?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "disability_percentage",
+              "validation_rule": {
+                "min": 0,
+                "max": 100
+              },
+              "help_text": "Many disability schemes require 40% or more.",
+              "conditions": [
+                {
+                  "depends_on_question_code": "HAS_DISABILITY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_DISABILITY_CERTIFICATE",
+              "question_text": "Do you have a disability certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "has_disability_certificate",
+              "conditions": [
+                {
+                  "depends_on_question_code": "HAS_DISABILITY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "ASSETS_HOUSING",
+          "section_name": "Assets / Housing",
+          "display_order": 10,
+          "questions": [
+            {
+              "question_code": "OWNS_HOUSE",
+              "question_text": "Do you own a house?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "owns_house"
+            },
+            {
+              "question_code": "HOUSE_OWNERSHIP_STATUS",
+              "question_text": "What is your house ownership status?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "house_ownership_status",
+              "options": [
+                {
+                  "option_code": "OWNED",
+                  "option_label": "Owned",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "JOINT",
+                  "option_label": "Jointly owned",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "LEASED",
+                  "option_label": "Leased/Rented",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "None",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "OWNS_HOUSE",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "OWNS_VEHICLE",
+              "question_text": "Do you own a vehicle?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "owns_vehicle"
+            },
+            {
+              "question_code": "OWNS_LIVESTOCK",
+              "question_text": "Do you own livestock?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "owns_livestock"
+            }
+          ]
+        },
+        {
+          "section_code": "SOCIAL_INFO",
+          "section_name": "Social Information",
+          "display_order": 11,
+          "questions": [
+            {
+              "question_code": "SOCIAL_CATEGORY",
+              "question_text": "What is your social category?",
+              "question_type": "single_choice",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "social_category",
+              "options": [
+                {
+                  "option_code": "GEN",
+                  "option_label": "General",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "OBC",
+                  "option_label": "OBC",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SC",
+                  "option_label": "SC",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "ST",
+                  "option_label": "ST",
+                  "display_order": 4
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_CASTE_CERTIFICATE",
+              "question_text": "Do you have a caste certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "has_caste_certificate",
+              "conditions": [
+                {
+                  "depends_on_question_code": "SOCIAL_CATEGORY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "GEN",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "DOCUMENTS",
+          "section_name": "Documents",
+          "display_order": 12,
+          "questions": [
+            {
+              "question_code": "HAS_AADHAAR",
+              "question_text": "Do you have an Aadhaar card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "has_aadhaar"
+            },
+            {
+              "question_code": "HAS_RATION_CARD",
+              "question_text": "Do you have a ration card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "has_ration_card"
+            },
+            {
+              "question_code": "HAS_INCOME_CERTIFICATE",
+              "question_text": "Do you have a valid income certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "has_income_certificate"
+            },
+            {
+              "question_code": "HAS_DOMICILE_CERTIFICATE",
+              "question_text": "Do you have a domicile/residence certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "has_domicile_certificate"
+            },
+            {
+              "question_code": "HAS_BONAFIDE_CERTIFICATE",
+              "question_text": "Do you have a bonafide certificate from your institution?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "has_bonafide_certificate",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_MARKSHEET",
+              "question_text": "Do you have your latest marksheet?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "has_marksheet",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_LAND_RECORDS",
+              "question_text": "Do you have land records (7/12, khasra, etc.)?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "has_land_records",
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_BANK_ACCOUNT",
+              "question_text": "Do you have a bank account?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 8,
+              "profile_field": "has_bank_account"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "form_code": "GENERAL_CITIZEN_PROFILE",
+      "form_name": "Citizen Profile",
+      "description": "Welfare-relevant citizen profile. Identity (name, date of birth, gender) is established once during profile creation and is not re-asked here. Sections for student, farmer, employed, self-employed and disability contexts are revealed by answers; citizen types are NOT mutually exclusive.",
+      "target_citizen_type": "GENERAL",
+      "version": 3,
+      "status": "ACTIVE",
+      "sections": [
+        {
+          "section_code": "PERSONAL_INFO",
+          "section_name": "Personal Information",
+          "display_order": 1,
+          "questions": [
+            {
+              "question_code": "MARITAL_STATUS",
+              "question_text": "What is your marital status?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "marital_status",
+              "options": [
+                {
+                  "option_code": "SINGLE",
+                  "option_label": "Single",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "MARRIED",
+                  "option_label": "Married",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "WIDOWED",
+                  "option_label": "Widowed",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "DIVORCED",
+                  "option_label": "Divorced",
+                  "display_order": 4
+                }
+              ]
+            },
+            {
+              "question_code": "RELIGION",
+              "question_text": "What is your religion?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "religion",
+              "help_text": "Used to determine eligibility for minority welfare schemes.",
+              "options": [
+                {
+                  "option_code": "HINDU",
+                  "option_label": "Hindu",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "MUSLIM",
+                  "option_label": "Muslim",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "CHRISTIAN",
+                  "option_label": "Christian",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "SIKH",
+                  "option_label": "Sikh",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "BUDDHIST",
+                  "option_label": "Buddhist",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "JAIN",
+                  "option_label": "Jain",
+                  "display_order": 6
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 7
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "CONTACT_INFO",
+          "section_name": "Contact Information",
+          "display_order": 2,
+          "questions": [
+            {
+              "question_code": "MOBILE_NUMBER",
+              "question_text": "Your mobile number",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "mobile_number",
+              "validation_rule": {
+                "pattern": "^[6-9][0-9]{9}$"
+              },
+              "placeholder": "10-digit mobile number"
+            },
+            {
+              "question_code": "EMAIL_ID",
+              "question_text": "Your email address",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "email_id",
+              "validation_rule": {
+                "email": true
+              }
+            }
+          ]
+        },
+        {
+          "section_code": "FAMILY_INFO",
+          "section_name": "Family / Household",
+          "display_order": 3,
+          "questions": [
+            {
+              "question_code": "FAMILY_SIZE",
+              "question_text": "How many members are there in your family (including you)?",
+              "question_type": "number",
+              "data_type": "INTEGER",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "family_size",
+              "validation_rule": {
+                "min": 1,
+                "max": 30
+              }
+            },
+            {
+              "question_code": "FAMILY_MEMBERS",
+              "question_text": "Add your family members",
+              "question_type": "text",
+              "data_type": "JSON",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "family_members",
+              "help_text": "Repeating block: each member needs a relationship (SELF, SPOUSE, SON, DAUGHTER, FATHER, MOTHER, OTHER) and a name or date of birth.",
+              "placeholder": "[]"
+            }
+          ]
+        },
+        {
+          "section_code": "LOCATION_INFO",
+          "section_name": "Location",
+          "display_order": 4,
+          "questions": [
+            {
+              "question_code": "STATE",
+              "question_text": "Which state do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "state"
+            },
+            {
+              "question_code": "DISTRICT",
+              "question_text": "Which district do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": true,
+              "display_order": 2,
+              "profile_field": "district"
+            },
+            {
+              "question_code": "VILLAGE_CITY",
+              "question_text": "Which village, town or city do you live in?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "village_city"
+            },
+            {
+              "question_code": "PINCODE",
+              "question_text": "What is your PIN code?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "pincode",
+              "validation_rule": {
+                "pattern": "^[1-9][0-9]{5}$"
+              }
+            },
+            {
+              "question_code": "AREA_TYPE",
+              "question_text": "Is your area rural or urban?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "area_type",
+              "options": [
+                {
+                  "option_code": "RURAL",
+                  "option_label": "Rural",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "URBAN",
+                  "option_label": "Urban",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SEMI_URBAN",
+                  "option_label": "Semi-Urban",
+                  "display_order": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "FINANCIAL_INFO",
+          "section_name": "Financial / Economic",
+          "display_order": 5,
+          "questions": [
+            {
+              "question_code": "ANNUAL_INCOME",
+              "question_text": "What is your family's total annual income (in rupees per year)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "annual_income",
+              "validation_rule": {
+                "min": 0
+              },
+              "help_text": "Household income from all sources. Examples: 240000, 2.4 lakh."
+            },
+            {
+              "question_code": "POVERTY_CATEGORY",
+              "question_text": "Which ration card category does your family hold?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "poverty_category",
+              "options": [
+                {
+                  "option_code": "APL",
+                  "option_label": "APL (Above Poverty Line)",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "BPL",
+                  "option_label": "BPL (Below Poverty Line)",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "AAY",
+                  "option_label": "AAY (Antyodaya)",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "No ration card",
+                  "display_order": 4
+                }
+              ],
+              "help_text": "BPL card possession is recorded automatically from this answer."
+            },
+            {
+              "question_code": "INCOME_SOURCE",
+              "question_text": "What is the main source of your family's income?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "income_source",
+              "options": [
+                {
+                  "option_code": "AGRICULTURE",
+                  "option_label": "Agriculture",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "WAGES",
+                  "option_label": "Daily wages",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SALARY",
+                  "option_label": "Salary",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "BUSINESS",
+                  "option_label": "Business",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "PENSION",
+                  "option_label": "Pension",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 6
+                }
+              ]
+            },
+            {
+              "question_code": "IS_INCOME_TAX_PAYER",
+              "question_text": "Does your family pay income tax?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "is_income_tax_payer"
+            }
+          ]
+        },
+        {
+          "section_code": "EDUCATION_INFO",
+          "section_name": "Education",
+          "display_order": 6,
+          "questions": [
+            {
+              "question_code": "CURRENTLY_STUDYING",
+              "question_text": "Are you currently studying?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "currently_studying",
+              "options": [
+                {
+                  "option_code": "YES",
+                  "option_label": "Yes",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "NO",
+                  "option_label": "No",
+                  "display_order": 2
+                }
+              ]
+            },
+            {
+              "question_code": "EDUCATION_LEVEL",
+              "question_text": "What is your highest education level?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "education_level",
+              "options": [
+                {
+                  "option_code": "ILLITERATE",
+                  "option_label": "Illiterate",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PRIMARY",
+                  "option_label": "Primary",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SECONDARY",
+                  "option_label": "Secondary",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "HIGHER_SECONDARY",
+                  "option_label": "Higher Secondary",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "GRADUATE",
+                  "option_label": "Graduate",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "POST_GRADUATE",
+                  "option_label": "Post Graduate",
+                  "display_order": 6
+                }
+              ]
+            },
+            {
+              "question_code": "COURSE_NAME",
+              "question_text": "Which course are you studying?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "course_name",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "YEAR_OF_STUDY",
+              "question_text": "Which year of study are you in?",
+              "question_type": "number",
+              "data_type": "INTEGER",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "year_of_study",
+              "validation_rule": {
+                "min": 1,
+                "max": 10
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "ACADEMIC_YEAR",
+              "question_text": "Current academic year (e.g. 2026-27)",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "academic_year",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "INSTITUTION_NAME",
+              "question_text": "Which institution are you studying at?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "institution_name",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "INSTITUTION_TYPE",
+              "question_text": "What type of institution is it?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "institution_type",
+              "options": [
+                {
+                  "option_code": "GOVERNMENT",
+                  "option_label": "Government",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PRIVATE",
+                  "option_label": "Private",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "AIDED",
+                  "option_label": "Aided",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "MARKS_PERCENTAGE",
+              "question_text": "What was your latest marks percentage?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 8,
+              "profile_field": "marks_percentage",
+              "validation_rule": {
+                "min": 0,
+                "max": 100
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "ANNUAL_FEE",
+              "question_text": "What is your annual course fee (in rupees)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 9,
+              "profile_field": "annual_fee",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HOSTEL_STATUS",
+              "question_text": "Are you a hosteller or a day scholar?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 10,
+              "profile_field": "hostel_status",
+              "options": [
+                {
+                  "option_code": "HOSTELLER",
+                  "option_label": "Hosteller",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "DAY_SCHOLAR",
+                  "option_label": "Day Scholar",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "Not applicable",
+                  "display_order": 3
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "SCHOLARSHIP_CURRENTLY_RECEIVED",
+              "question_text": "Do you currently receive any scholarship?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 11,
+              "profile_field": "scholarship_currently_received",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "EMPLOYMENT_INFO",
+          "section_name": "Employment",
+          "display_order": 7,
+          "questions": [
+            {
+              "question_code": "EMPLOYMENT_STATUS",
+              "question_text": "What is your employment status?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "employment_status",
+              "options": [
+                {
+                  "option_code": "EMPLOYED",
+                  "option_label": "Employed",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "UNEMPLOYED",
+                  "option_label": "Unemployed",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SELF_EMPLOYED",
+                  "option_label": "Self Employed",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "STUDENT",
+                  "option_label": "Student",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "RETIRED",
+                  "option_label": "Retired",
+                  "display_order": 5
+                }
+              ]
+            },
+            {
+              "question_code": "OCCUPATION",
+              "question_text": "What is your occupation?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "occupation",
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "IN",
+                  "comparison_value": "EMPLOYED,SELF_EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "EMPLOYMENT_TYPE",
+              "question_text": "What type of employment do you have?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "employment_type",
+              "options": [
+                {
+                  "option_code": "PERMANENT",
+                  "option_label": "Permanent",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "CONTRACT",
+                  "option_label": "Contract",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "CASUAL",
+                  "option_label": "Casual",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "EQUALS",
+                  "comparison_value": "EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "EMPLOYER_TYPE",
+              "question_text": "What type of employer do you work for?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "employer_type",
+              "options": [
+                {
+                  "option_code": "GOVERNMENT",
+                  "option_label": "Government",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "PRIVATE",
+                  "option_label": "Private",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "COOPERATIVE",
+                  "option_label": "Cooperative",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NGO",
+                  "option_label": "NGO",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "HOUSEHOLD",
+                  "option_label": "Household",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 6
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "EQUALS",
+                  "comparison_value": "EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "EMPLOYER_NAME",
+              "question_text": "What is the name of your employer?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "employer_name",
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "EQUALS",
+                  "comparison_value": "EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "MONTHLY_INCOME",
+              "question_text": "What is your monthly personal income (in rupees)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "monthly_income",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "IN",
+                  "comparison_value": "EMPLOYED,SELF_EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "WORK_SECTOR",
+              "question_text": "Do you work in the formal or informal sector?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "work_sector",
+              "options": [
+                {
+                  "option_code": "FORMAL",
+                  "option_label": "Formal",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "INFORMAL",
+                  "option_label": "Informal",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "AGRICULTURE",
+                  "option_label": "Agriculture",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "EMPLOYMENT_STATUS",
+                  "operator": "IN",
+                  "comparison_value": "EMPLOYED,SELF_EMPLOYED",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "AGRICULTURE_INFO",
+          "section_name": "Agriculture",
+          "display_order": 8,
+          "questions": [
+            {
+              "question_code": "FARMER_STATUS",
+              "question_text": "Are you engaged in farming?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "farmer_status",
+              "options": [
+                {
+                  "option_code": "YES",
+                  "option_label": "Yes",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "NO",
+                  "option_label": "No",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "MARGINAL",
+                  "option_label": "Yes - marginal farmer",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "SMALL",
+                  "option_label": "Yes - small farmer",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 5
+                }
+              ]
+            },
+            {
+              "question_code": "FARMER_TYPE",
+              "question_text": "Are you an owner, tenant, or sharecropper?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "farmer_type",
+              "options": [
+                {
+                  "option_code": "OWNER",
+                  "option_label": "Owner",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "TENANT",
+                  "option_label": "Tenant",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SHARECROPPER",
+                  "option_label": "Sharecropper",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "LAND_OWNERSHIP_STATUS",
+              "question_text": "Is your land owned, leased, or both?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "land_ownership_status",
+              "options": [
+                {
+                  "option_code": "OWNED",
+                  "option_label": "Owned",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "LEASED",
+                  "option_label": "Leased",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "BOTH",
+                  "option_label": "Both",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "None",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "TOTAL_LAND_AREA",
+              "question_text": "What is your total land area?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "total_land_area",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "LAND_UNIT",
+              "question_text": "Which unit is your land area measured in?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "land_unit",
+              "options": [
+                {
+                  "option_code": "HECTARE",
+                  "option_label": "Hectare",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "ACRE",
+                  "option_label": "Acre",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "BIGHA",
+                  "option_label": "Bigha",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "GUNTHA",
+                  "option_label": "Guntha",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "CULTIVATED_AREA",
+              "question_text": "How much land do you cultivate?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "cultivated_land_area",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "IRRIGATED_AREA",
+              "question_text": "How much of your land is irrigated?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "irrigated_land_area",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "CROP_TYPE",
+              "question_text": "Which crops do you mainly grow?",
+              "question_type": "text",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 8,
+              "profile_field": "crop_type",
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "AGRICULTURAL_INCOME",
+              "question_text": "What is your annual agricultural income (in rupees)?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 9,
+              "profile_field": "agricultural_income",
+              "validation_rule": {
+                "min": 0
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_KCC",
+              "question_text": "Do you have a Kisan Credit Card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 10,
+              "profile_field": "has_kcc",
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "DISABILITY_INFO",
+          "section_name": "Disability / Special Circumstances",
+          "display_order": 9,
+          "questions": [
+            {
+              "question_code": "HAS_DISABILITY",
+              "question_text": "Do you have a disability?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "has_disability",
+              "options": [
+                {
+                  "option_code": "YES",
+                  "option_label": "Yes",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "NO",
+                  "option_label": "No",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "PENDING",
+                  "option_label": "Under assessment",
+                  "display_order": 3
+                }
+              ]
+            },
+            {
+              "question_code": "DISABILITY_TYPE",
+              "question_text": "What type of disability do you have?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "disability_type",
+              "options": [
+                {
+                  "option_code": "PHYSICAL",
+                  "option_label": "Physical",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "VISUAL",
+                  "option_label": "Visual",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "HEARING",
+                  "option_label": "Hearing",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "INTELLECTUAL",
+                  "option_label": "Intellectual",
+                  "display_order": 4
+                },
+                {
+                  "option_code": "MULTIPLE",
+                  "option_label": "Multiple",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "OTHER",
+                  "option_label": "Other",
+                  "display_order": 6
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "HAS_DISABILITY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "DISABILITY_PERCENTAGE",
+              "question_text": "What is your certified disability percentage?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "disability_percentage",
+              "validation_rule": {
+                "min": 0,
+                "max": 100
+              },
+              "help_text": "Many disability schemes require 40% or more.",
+              "conditions": [
+                {
+                  "depends_on_question_code": "HAS_DISABILITY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_DISABILITY_CERTIFICATE",
+              "question_text": "Do you have a disability certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "has_disability_certificate",
+              "conditions": [
+                {
+                  "depends_on_question_code": "HAS_DISABILITY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "ASSETS_HOUSING",
+          "section_name": "Assets / Housing",
+          "display_order": 10,
+          "questions": [
+            {
+              "question_code": "OWNS_HOUSE",
+              "question_text": "Do you own a house?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "owns_house"
+            },
+            {
+              "question_code": "HOUSE_OWNERSHIP_STATUS",
+              "question_text": "What is your house ownership status?",
+              "question_type": "dropdown",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "house_ownership_status",
+              "options": [
+                {
+                  "option_code": "OWNED",
+                  "option_label": "Owned",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "JOINT",
+                  "option_label": "Jointly owned",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "LEASED",
+                  "option_label": "Leased/Rented",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "NONE",
+                  "option_label": "None",
+                  "display_order": 4
+                }
+              ],
+              "conditions": [
+                {
+                  "depends_on_question_code": "OWNS_HOUSE",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "OWNS_VEHICLE",
+              "question_text": "Do you own a vehicle?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "owns_vehicle"
+            },
+            {
+              "question_code": "OWNS_LIVESTOCK",
+              "question_text": "Do you own livestock?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "owns_livestock"
+            }
+          ]
+        },
+        {
+          "section_code": "SOCIAL_INFO",
+          "section_name": "Social Information",
+          "display_order": 11,
+          "questions": [
+            {
+              "question_code": "SOCIAL_CATEGORY",
+              "question_text": "What is your social category?",
+              "question_type": "single_choice",
+              "data_type": "STRING",
+              "required": false,
+              "display_order": 1,
+              "profile_field": "social_category",
+              "options": [
+                {
+                  "option_code": "GEN",
+                  "option_label": "General",
+                  "display_order": 1
+                },
+                {
+                  "option_code": "OBC",
+                  "option_label": "OBC",
+                  "display_order": 2
+                },
+                {
+                  "option_code": "SC",
+                  "option_label": "SC",
+                  "display_order": 3
+                },
+                {
+                  "option_code": "ST",
+                  "option_label": "ST",
+                  "display_order": 4
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_CASTE_CERTIFICATE",
+              "question_text": "Do you have a caste certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "has_caste_certificate",
+              "conditions": [
+                {
+                  "depends_on_question_code": "SOCIAL_CATEGORY",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "GEN",
+                  "action": "SHOW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "section_code": "DOCUMENTS",
+          "section_name": "Documents",
+          "display_order": 12,
+          "questions": [
+            {
+              "question_code": "HAS_AADHAAR",
+              "question_text": "Do you have an Aadhaar card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": true,
+              "display_order": 1,
+              "profile_field": "has_aadhaar"
+            },
+            {
+              "question_code": "HAS_RATION_CARD",
+              "question_text": "Do you have a ration card?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 2,
+              "profile_field": "has_ration_card"
+            },
+            {
+              "question_code": "HAS_INCOME_CERTIFICATE",
+              "question_text": "Do you have a valid income certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 3,
+              "profile_field": "has_income_certificate"
+            },
+            {
+              "question_code": "HAS_DOMICILE_CERTIFICATE",
+              "question_text": "Do you have a domicile/residence certificate?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 4,
+              "profile_field": "has_domicile_certificate"
+            },
+            {
+              "question_code": "HAS_BONAFIDE_CERTIFICATE",
+              "question_text": "Do you have a bonafide certificate from your institution?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "has_bonafide_certificate",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_MARKSHEET",
+              "question_text": "Do you have your latest marksheet?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "has_marksheet",
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_LAND_RECORDS",
+              "question_text": "Do you have land records (7/12, khasra, etc.)?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 7,
+              "profile_field": "has_land_records",
+              "conditions": [
+                {
+                  "depends_on_question_code": "FARMER_STATUS",
+                  "operator": "NOT_EQUALS",
+                  "comparison_value": "NO",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "HAS_BANK_ACCOUNT",
+              "question_text": "Do you have a bank account?",
+              "question_type": "boolean",
+              "data_type": "BOOLEAN",
+              "required": false,
+              "display_order": 8,
+              "profile_field": "has_bank_account"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

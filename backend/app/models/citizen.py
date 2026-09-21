@@ -51,6 +51,12 @@ class CitizenMaster(Base):
     assessments: Mapped[list["EligibilityAssessment"]] = relationship(  # type: ignore[name-defined]
         back_populates="citizen", cascade="all, delete-orphan"
     )
+    # Normalized profile facts (tbl_profile_fact); open (current) facts are
+    # consumed by the eligibility engine via get_full_profile eager loading.
+    profile_facts: Mapped[list["ProfileFact"]] = relationship(  # type: ignore[name-defined]
+        primaryjoin="CitizenMaster.citizen_id == ProfileFact.citizen_id",
+        viewonly=True,
+    )
 
     def __repr__(self) -> str:
         return f"<CitizenMaster {self.citizen_id} {self.full_name}>"

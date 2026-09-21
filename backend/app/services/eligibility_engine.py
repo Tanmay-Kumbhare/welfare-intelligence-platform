@@ -7,11 +7,11 @@ Produces full evaluation details for explainability.
 from __future__ import annotations
 
 import logging
-from datetime import date
 from typing import Any, Tuple
 
 from app.models.citizen import CitizenMaster
 from app.models.scheme import SchemeMaster, SchemeEligibilityRule
+from app.utils.date_calc import calculate_age
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +83,21 @@ class EligibilityEngine:
     def _resolve_parameter(self, citizen: CitizenMaster, parameter_name: str) -> Any:
         """Map parameter names to actual DB column values."""
         if parameter_name == "age":
-            # Compute age dynamically
-            today = date.today()
+            # Canonical source: the normalized AGE profile fact (derived from
+            # the citizen-submitted DATE_OF_BIRTH by normalization). Falls
+            # back to identity-record DOB + calculate_age only for citizens
+            # who have never completed a form (no fact layer yet).
+            facts = getattr(citizen, "profile_facts", None) or []
+            for fact in facts:
+                if fact.fact_code == "AGE" and fact.effective_until is None:
+                    try:
+                        return int(fact.fact_value)
+                    except (TypeError, ValueError):
+                        break
             dob = citizen.date_of_birth
-            return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            if dob is None:
+                return None
+            return calculate_age(dob)
         
         elif parameter_name == "gender":
             return citizen.gender

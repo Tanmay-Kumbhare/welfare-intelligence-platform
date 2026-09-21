@@ -47,6 +47,32 @@ class SchemeMaster(Base):
     # FARMER | STUDENT | SENIOR | GENERAL — persona tag for filtered discovery
     target_persona: Mapped[str | None] = mapped_column(String(50), index=True)
 
+    # ------------------------------------------------------------------
+    # Phase 1: source-independent canonical fields for future ingestion.
+    # Raw source content lives in tbl_scheme_source_document/_content —
+    # never duplicated here. All fields nullable → existing seed rows
+    # remain valid unchanged.
+    # ------------------------------------------------------------------
+    # Government's own identifier for the scheme (e.g. scheme code).
+    official_scheme_identifier: Mapped[str | None] = mapped_column(String(100))
+    # Where the scheme record came from: MANUAL_SEED | GOVERNMENT_API |
+    # GOVERNMENT_WEBSITE | GOVERNMENT_PORTAL | GOVERNMENT_PDF |
+    # OTHER_AUTHORIZED_SOURCE
+    source_type: Mapped[str | None] = mapped_column(String(50))
+    # Human-readable source name (e.g. ministry/portal name).
+    source_name: Mapped[str | None] = mapped_column(String(255))
+    # Canonical URL describing the scheme.
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    # FRESH_APPLICATION | RENEWAL | BOTH | CONTINUOUS | WINDOW_BASED
+    application_window_type: Mapped[str | None] = mapped_column(String(30))
+    # When the application window closes (if applicable).
+    end_date: Mapped[date | None] = mapped_column(Date)
+    # Record version, incremented on substantive scheme revisions.
+    scheme_version: Mapped[int] = mapped_column(Integer, default=1)
+    last_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Overrides/extends the V1 last_verified_at date with a timestamp.
+    last_verified_at_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Relationships
     rule_groups: Mapped[list["SchemeRuleGroup"]] = relationship(
         back_populates="scheme",

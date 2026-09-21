@@ -36,6 +36,7 @@ from app.schemas.form import (
     SubmissionUpdate,
 )
 from app.services.form_logic import (
+    AnswerValidationError,
     CitizenNotFoundError,
     FormNotFoundError,
     IncompleteSubmissionError,
@@ -200,11 +201,33 @@ class SubmissionService:
             ],
         )
 
+    @staticmethod
+    def _validate_family_member_count(
+        questions: Sequence[FormQuestion], answers_by_qid: dict,
+    ) -> None:
+        """Keep the optional repeating block consistent with FAMILY_SIZE."""
+        family_size_question = next(
+            (q for q in questions if q.profile_field == "family_size"), None
+        )
+        members_question = next(
+            (q for q in questions if q.profile_field == "family_members"), None
+        )
+        if family_size_question is None or members_question is None:
+            return
+        family_size = answers_by_qid.get(family_size_question.question_id)
+        members = answers_by_qid.get(members_question.question_id)
+        if members and family_size is not None and len(members) != family_size:
+            raise AnswerValidationError(
+                "Family member details must match the family size."
+            )
+
     async def _apply_answers(
         self,
         submission: FormSubmission,
         form: FormDefinition,
         answers: Sequence[AnswerInput],
+        *,
+        sync_loaded_collection: bool = False,
     ) -> None:
         """Validate and upsert every answer in the payload.
 
@@ -275,6 +298,19 @@ class SubmissionService:
 
         await self.repo.add_answers(to_add)
         await self.repo.delete_answers(to_delete)
+        # ``update_submission`` already loaded this collection eagerly. Keep
+        # that in-memory graph current so the caller can calculate progress
+        # and serialize the response without a second SELECT + selectinload
+        # round trip. Creation/resume retains the conservative re-fetch path,
+        # where the relationship may not yet be loaded.
+        if sync_loaded_collection:
+            questions_by_id = {question.question_id: question for question, _, _, _ in resolved}
+            for answer in to_delete:
+                if answer in submission.answers:
+                    submission.answers.remove(answer)
+            for answer in to_add:
+                answer.question = questions_by_id[answer.question_id]
+                submission.answers.append(answer)
 
     async def _refresh_progress(
         self,
@@ -338,6 +374,9 @@ class SubmissionService:
                 await self._apply_answers(existing, form, data.answers)
                 existing.status = "IN_PROGRESS"
             fresh, form, stats = await self._refresh_progress(existing, form)
+            self._validate_family_member_count(
+                await self._form_questions(form), self._answers_by_qid(fresh)
+            )
             return self._to_response(fresh, form, stats)
 
         # Citizen existence was already verified above via the dedicated
@@ -353,6 +392,9 @@ class SubmissionService:
             await self._apply_answers(submission, form, data.answers)
             submission.status = "IN_PROGRESS"
         fresh, form, stats = await self._refresh_progress(submission, form)
+        self._validate_family_member_count(
+            await self._form_questions(form), self._answers_by_qid(fresh)
+        )
         return self._to_response(fresh, form, stats)
 
     async def _resolve_active_form(self, form_code: str) -> FormDefinition:
@@ -387,13 +429,20 @@ class SubmissionService:
             )
         form = await self._load_form(submission)
         if data.answers:
-            await self._apply_answers(submission, form, data.answers)
+            await self._apply_answers(
+                submission, form, data.answers, sync_loaded_collection=True
+            )
         if data.status is not None:
             submission.status = data.status
         elif submission.status == "DRAFT" and data.answers:
             submission.status = "IN_PROGRESS"
-        fresh, form, stats = await self._refresh_progress(submission, form)
-        return self._to_response(fresh, form, stats)
+        questions = await self._form_questions(form)
+        answers_by_qid = self._answers_by_qid(submission)
+        self._validate_family_member_count(questions, answers_by_qid)
+        stats = compute_progress(questions, answers_by_qid)
+        submission.completion_percentage = stats.percentage
+        await self.db.flush()
+        return self._to_response(submission, form, stats)
 
     async def complete_submission(
         self, submission_id: uuid.UUID, citizen_id: uuid.UUID

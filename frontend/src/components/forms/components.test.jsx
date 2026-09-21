@@ -77,6 +77,17 @@ describe("QuestionRenderer", () => {
     );
     expect(screen.getByText(/not yet supported/i)).toBeInTheDocument();
   });
+
+  it("uses a structured repeating block for JSON family members", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<QuestionRenderer question={{
+      ...byCode("MARITAL_STATUS"), question_id: "family-members", question_code: "FAMILY_MEMBERS",
+      question_text: "Add your family members", question_type: "text", data_type: "JSON", profile_field: "family_members",
+    }} value={[]} onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: /add family member/i }));
+    expect(onChange).toHaveBeenCalledWith([{ relationship: "", name: "", date_of_birth: "" }]);
+  });
 });
 
 describe("FormSection conditional visibility", () => {

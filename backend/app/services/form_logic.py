@@ -506,6 +506,25 @@ def validate_and_map_answer(
             raise AnswerValidationError(
                 f"Question '{code}' expects a JSON object or list"
             )
+        if (question.profile_field or "").lower() == "family_members":
+            if not isinstance(value, list):
+                raise AnswerValidationError("Family member details must be a list.")
+            allowed = {"SELF", "SPOUSE", "SON", "DAUGHTER", "FATHER", "MOTHER", "OTHER"}
+            for member in value:
+                if not isinstance(member, dict):
+                    raise AnswerValidationError("Each family member must contain structured details.")
+                relationship = member.get("relationship")
+                if not isinstance(relationship, str) or relationship.strip().upper() not in allowed:
+                    raise AnswerValidationError("Please select a valid relationship for every family member.")
+                name = member.get("name")
+                dob = member.get("date_of_birth")
+                if not (isinstance(name, str) and name.strip()) and not (isinstance(dob, str) and dob.strip()):
+                    raise AnswerValidationError("Each family member needs a name or date of birth.")
+                if isinstance(dob, str) and dob.strip():
+                    try:
+                        date.fromisoformat(dob.strip())
+                    except ValueError:
+                        raise AnswerValidationError("Family member dates of birth must use YYYY-MM-DD.")
         return ("answer_json", value)
 
     # STRING default — covers text, file references, and string locations.

@@ -6,6 +6,7 @@ import BooleanQuestion from "./inputs/BooleanQuestion";
 import SelectQuestion from "./inputs/SelectQuestion";
 import MultiSelectQuestion from "./inputs/MultiSelectQuestion";
 import FileQuestion from "./inputs/FileQuestion";
+import FamilyMembersQuestion from "./inputs/FamilyMembersQuestion";
 
 /**
  * Maps a form question definition to its input component. Question types come
@@ -26,6 +27,12 @@ const RENDERERS = {
 };
 
 export default function QuestionRenderer({ question, value, error, onChange }) {
+  if (
+    (question.profile_field || "").toLowerCase() === "family_members"
+    && (question.data_type || "").toUpperCase() === "JSON"
+  ) {
+    return <FamilyMembersQuestion question={question} value={value} error={error} onChange={onChange} />;
+  }
   const Renderer = RENDERERS[(question.question_type || "").toLowerCase()];
   if (!Renderer) {
     return (

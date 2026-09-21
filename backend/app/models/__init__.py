@@ -31,6 +31,17 @@ from app.models.domain_profile import (
     EmploymentProfile,
     FamilyMember,
 )
+# Phase 1: scheme sources and ingestion infrastructure
+from app.models.scheme_source import (
+    CONTENT_TYPES,
+    PROCESSING_STATUSES,
+    SCHEME_SOURCE_TYPES,
+    SchemeIngestionRun,
+    SchemeRuleProvenance,
+    SchemeSource,
+    SchemeSourceContent,
+    SchemeSourceDocument,
+)
 
 __all__ = [
     "CitizenMaster",
@@ -66,4 +77,13 @@ __all__ = [
     "AgricultureProfile",
     "DisabilityProfile",
     "AssetProfile",
+    # Phase 1: scheme sources
+    "SchemeSource",
+    "SchemeSourceDocument",
+    "SchemeSourceContent",
+    "SchemeRuleProvenance",
+    "SchemeIngestionRun",
+    "SCHEME_SOURCE_TYPES",
+    "CONTENT_TYPES",
+    "PROCESSING_STATUSES",
 ]

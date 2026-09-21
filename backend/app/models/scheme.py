@@ -11,9 +11,9 @@ Tables:
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -64,6 +64,11 @@ class SchemeMaster(Base):
     assessments: Mapped[list["EligibilityAssessment"]] = relationship(  # type: ignore[name-defined]
         back_populates="scheme",
         cascade="all, delete-orphan",
+    )
+    # Source documents linked to this scheme (external ingestion foundation).
+    source_documents: Mapped[list["SchemeSourceDocument"]] = relationship(  # type: ignore[name-defined]
+        back_populates="scheme",
+        viewonly=True,
     )
 
     def __repr__(self) -> str:

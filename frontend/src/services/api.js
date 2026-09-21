@@ -9,6 +9,7 @@ const api = axios.create({
 export const citizenService = {
   register: (data) => api.post("/citizens/", data),
   get: (id) => api.get(`/citizens/${id}`),
+  update: (id, data) => api.put(`/citizens/${id}`, data),
 };
 
 export const schemeService = {

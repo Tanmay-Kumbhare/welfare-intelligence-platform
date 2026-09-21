@@ -578,3 +578,21 @@ class TestAgeConsistencyPreserved:
         from app.utils.date_calc import calculate_age
 
         assert facts["AGE"] == str(calculate_age(date(1999, 1, 1)))
+
+    def test_profile_update_keeps_the_same_citizen_identity(self, client, tracked):
+        citizen = _register(client, tracked)
+        payload = {
+            "full_name": "Updated Identity",
+            "date_of_birth": "2001-03-15",
+            "gender": "FEMALE",
+            "citizen_type": "GENERAL",
+            "demographic": {"disability_status": "NONE", "family_size": 3},
+            "financial": {"is_bpl_card_holder": True, "is_income_tax_payer": False},
+            "location": {"state": "Maharashtra"},
+        }
+        response = client.put(f"/api/v1/citizens/{citizen['citizen_id']}", json=payload)
+        assert response.status_code == 200, response.text
+        assert response.json()["citizen_id"] == citizen["citizen_id"]
+        assert response.json()["full_name"] == "Updated Identity"
+        refreshed = client.get(f"/api/v1/citizens/{citizen['citizen_id']}")
+        assert refreshed.json()["demographic"]["family_size"] == 3

@@ -1,113 +1,453 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, ChevronLeft, ChevronRight, ClipboardCheck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
 import { ErrorState, LoadingState } from "../components/ui/StatusStates";
-import { citizenService, eligibilityService } from "../services/api";
+import { citizenService, eligibilityService, formService, formSubmissionService } from "../services/api";
 import { clearStoredCitizenId, getStoredCitizenId, setStoredCitizenId } from "../utils/citizenStorage";
+import FormSection from "../components/forms/FormSection";
+import FormProgress from "../components/forms/FormProgress";
+import ReviewStep from "../components/forms/ReviewStep";
+import {
+  computeApplicableMap,
+  computeProgress,
+  storedAnswersByQuestionId,
+  percentage,
+  backendErrorMessage,
+} from "../components/forms/formLogic";
 
-const STEPS = ["About you", "Education / Work", "Financial", "Social / Family", "Location", "Review"];
-const CITIZEN_TYPES = [["FARMER", "Farmer"], ["STUDENT", "Student"], ["SENIOR", "Senior Citizen"], ["GENERAL", "General Citizen"]];
+const FORM_CODE = "GENERAL_CITIZEN_PROFILE";
 const TODAY = new Date().toISOString().slice(0, 10);
-const EMPTY_FORM = {
-  full_name: "", date_of_birth: "", gender: "", citizen_type: "GENERAL", education_level: "", occupation: "",
-  employment_status: "", annual_income: "", poverty_category: "", is_bpl_card_holder: false,
-  is_income_tax_payer: false, land_holding_size: "", social_category: "", disability_status: "NONE",
-  family_size: "", marital_status: "", state: "", district: "", village_city: "", area_type: "",
-};
 
-const text = (value) => value === null || value === undefined ? "" : String(value);
-function formFromCitizen(citizen) {
-  const demographic = citizen.demographic || {};
-  const financial = citizen.financial || {};
-  const location = citizen.location || {};
-  return {
-    full_name: text(citizen.full_name), date_of_birth: text(citizen.date_of_birth), gender: text(citizen.gender), citizen_type: citizen.citizen_type,
-    education_level: text(demographic.education_level), occupation: text(demographic.occupation), employment_status: text(financial.employment_status),
-    annual_income: text(financial.annual_income), poverty_category: text(financial.poverty_category), is_bpl_card_holder: Boolean(financial.is_bpl_card_holder),
-    is_income_tax_payer: Boolean(financial.is_income_tax_payer), land_holding_size: text(financial.land_holding_size), social_category: text(demographic.social_category),
-    disability_status: text(demographic.disability_status) || "NONE", family_size: text(demographic.family_size), marital_status: text(demographic.marital_status),
-    state: text(location.state), district: text(location.district), village_city: text(location.village_city), area_type: text(location.area_type),
-  };
+function answersPayload(answersMap) {
+  return [...answersMap.entries()]
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([question_id, value]) => ({ question_id, value, source: "USER_INPUT" }));
 }
-
-function numberOrNull(value) { return value === "" ? null : Number(value); }
-function payload(form) {
-  return {
-    full_name: form.full_name.trim(), date_of_birth: form.date_of_birth, gender: form.gender || null, citizen_type: form.citizen_type,
-    demographic: { education_level: form.education_level || null, occupation: form.occupation.trim() || null, family_size: form.family_size === "" ? null : Number(form.family_size), marital_status: form.marital_status || null, social_category: form.social_category || null, disability_status: form.disability_status, type_specific_metadata: null },
-    financial: { annual_income: numberOrNull(form.annual_income), employment_status: form.employment_status || null, income_source: null, poverty_category: form.poverty_category || null, land_holding_size: numberOrNull(form.land_holding_size), is_bpl_card_holder: form.is_bpl_card_holder, is_income_tax_payer: form.is_income_tax_payer },
-    location: { state: form.state.trim() || null, district: form.district.trim() || null, village_city: form.village_city.trim() || null, area_type: form.area_type || null },
-  };
-}
-
-function validate(form, step) {
-  const errors = {};
-  if (step === 0) {
-    if (form.full_name.trim().length < 2) errors.full_name = "Enter your full name.";
-    if (!form.date_of_birth) errors.date_of_birth = "Enter your date of birth.";
-    else if (form.date_of_birth >= TODAY) errors.date_of_birth = "Date of birth must be in the past.";
-    if (!CITIZEN_TYPES.some(([value]) => value === form.citizen_type)) errors.citizen_type = "Choose a valid citizen type.";
-  }
-  if (step === 2) {
-    for (const [field, label] of [["annual_income", "Annual income"], ["land_holding_size", "Land holding size"]]) {
-      if (form[field] !== "" && (!Number.isFinite(Number(form[field])) || Number(form[field]) < 0)) errors[field] = `${label} must be a non-negative number.`;
-    }
-  }
-  if (step === 3 && form.family_size !== "") {
-    const size = Number(form.family_size);
-    if (!Number.isInteger(size) || size < 1 || size > 50) errors.family_size = "Family size must be a whole number from 1 to 50.";
-  }
-  return errors;
-}
-
-function Summary({ label, value }) { return <div className="flex flex-col sm:flex-row sm:justify-between gap-1 py-2 border-b border-line last:border-0"><dt className="text-xs text-ink-soft">{label}</dt><dd className="text-sm text-ink sm:text-right">{value || "Not provided"}</dd></div>; }
 
 export default function CheckEligibilityPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [form, setForm] = useState({ ...EMPTY_FORM, citizen_type: searchParams.get("citizenType") || "GENERAL" });
-  const [step, setStep] = useState(0);
-  const [mode, setMode] = useState(() => getStoredCitizenId() ? "checking" : "create");
-  const [existing, setExisting] = useState(null);
-  const [errors, setErrors] = useState({});
+  const [phase, setPhase] = useState("loading"); // loading|no-citizen|form|form-error|review|submitting|normalizing|evaluating
+  const [identity, setIdentity] = useState(null);
+  const [form, setForm] = useState(null);
+  const [submission, setSubmission] = useState(null);
+  const [answers, setAnswers] = useState(() => new Map());
+  const [currentStep, setCurrentStep] = useState(0);
   const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [saveState, setSaveState] = useState("idle"); // idle|saving|saved
+  const [fieldErrors, setFieldErrors] = useState(() => new Map());
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+  const submissionInFlight = useRef(false);
+  const [loadKey, setLoadKey] = useState(0);
+
+  // ---------------- identity + form load (parallel) ----------------
+  // The citizen pointer (localStorage) and the active form definition are
+  // independent — fetch them together instead of serially. The form is the
+  // source of truth for every question; the citizen is the source of truth
+  // for identity (never re-asked inside the form).
+  useEffect(() => {
+    let cancelled = false;
+    const stored = getStoredCitizenId();
+    const citizenPromise = stored
+      ? citizenService
+          .get(stored)
+          .then((response) => response.data)
+          .catch(() => {
+            clearStoredCitizenId();
+            return null;
+          })
+      : Promise.resolve(null);
+
+    Promise.all([citizenPromise, formService.getActive(FORM_CODE)])
+      .then(([citizen, formResponse]) => {
+        if (cancelled) return;
+        setForm(formResponse.data);
+        if (citizen) {
+          setIdentity({
+            citizenId: citizen.citizen_id,
+            fullName: citizen.full_name,
+            dateOfBirth: citizen.date_of_birth,
+            gender: citizen.gender,
+          });
+          setPhase("form");
+        } else {
+          setPhase("no-citizen");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPhase("form-error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadKey]);
+
+  // ---------------- draft create/resume ----------------
+  const ensureSubmission = useCallback(async () => {
+    // POST /submissions resumes the citizen's latest editable draft server-
+    // side. The in-flight guard stops React StrictMode's double effect fire
+    // in dev from racing two creates (harmless server-side, but wasteful).
+    if (submissionInFlight.current) return null;
+    submissionInFlight.current = true;
+    try {
+      const response = await formSubmissionService.create(FORM_CODE, {
+        citizen_id: identity.citizenId,
+        answers: [],
+      });
+      setSubmission(response.data);
+      return response.data;
+    } finally {
+      submissionInFlight.current = false;
+    }
+  }, [identity]);
 
   useEffect(() => {
-    const id = getStoredCitizenId();
-    if (!id) return;
-    citizenService.get(id).then((response) => { setExisting(response.data); setForm(formFromCitizen(response.data)); setMode("existing"); }).catch(() => { clearStoredCitizenId(); setMode("create"); });
-  }, []);
+    if (phase !== "form" || !identity || !form || submission) return;
+    let cancelled = false;
+    ensureSubmission()
+      .then((draft) => {
+        if (cancelled || !draft) return;
+        setAnswers(storedAnswersByQuestionId(draft));
+        if (draft.completion_percentage > 0) setSaveState("saved");
+      })
+      .catch(() => {
+        if (!cancelled) setPhase("form-error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, identity, form, submission, ensureSubmission]);
 
-  const update = (field, value) => { setForm((current) => ({ ...current, [field]: value })); setErrors((current) => ({ ...current, [field]: undefined })); };
-  const next = () => { const nextErrors = validate(form, step); setErrors(nextErrors); if (!Object.keys(nextErrors).length) setStep((current) => Math.min(current + 1, STEPS.length - 1)); };
-  const evaluate = async (id) => { setSubmitting(true); setMessage(""); try { await eligibilityService.evaluate(id); navigate(`/results/${id}`); } catch { setMessage("Unable to check eligibility right now. Please try again."); } finally { setSubmitting(false); } };
-  const submit = async (event) => {
-    event.preventDefault();
-    const formErrors = validate(form, 0); setErrors(formErrors); if (Object.keys(formErrors).length) { setStep(0); return; }
-    setSubmitting(true); setMessage("");
-    try { const response = await citizenService.register(payload(form)); const id = response.data.citizen_id; setStoredCitizenId(id); await evaluate(id); }
-    catch { setSubmitting(false); setMessage("Unable to create your profile right now. Please check your details and try again."); }
+  // ---------------- derived state ----------------
+  const applicable = useMemo(
+    () => (form ? computeApplicableMap(form.sections, answers) : new Map()),
+    [form, answers],
+  );
+  const progress = useMemo(
+    () => (form ? computeProgress(form.sections, answers, applicable) : { total: 0, answered: 0, missingRequired: [] }),
+    [form, answers, applicable],
+  );
+  const completion = percentage(progress.answered, progress.total);
+  const sectionsCount = form?.sections.length ?? 0;
+  const currentSection = form?.sections[currentStep];
+
+  // ---------------- actions ----------------
+  const answerQuestion = (question, value) => {
+    setAnswers((current) => {
+      const next = new Map(current);
+      next.set(question.question_id, value);
+      return next;
+    });
+    setFieldErrors((current) => {
+      if (!current.has(question.question_id)) return current;
+      const next = new Map(current);
+      next.delete(question.question_id);
+      return next;
+    });
   };
 
-  if (mode === "checking") return <LoadingState label="Loading your profile..." />;
-  if (mode === "existing" && existing) return <div><h1 className="text-[30px] mb-3">Check your eligibility</h1><p className="max-w-[64ch] mb-7">Your saved citizen profile is ready. Run the backend eligibility check again or create a separate profile.</p>{message ? <ErrorState title="Eligibility check failed" message={message} onRetry={() => evaluate(existing.citizen_id)} /> : <Card><div className="flex items-start gap-4 mb-5"><ClipboardCheck className="h-6 w-6 text-accent-ink shrink-0" aria-hidden="true" /><div><h2 className="text-xl mb-1">{existing.full_name}</h2><p className="text-sm mb-0">{existing.citizen_type} profile loaded from the backend.</p></div></div><div className="flex flex-wrap gap-3"><Button onClick={() => evaluate(existing.citizen_id)} disabled={submitting}>{submitting ? "Checking..." : "Check eligibility"}</Button><Button to="/profile" variant="secondary">View profile</Button><Button variant="ghost" onClick={() => { clearStoredCitizenId(); setExisting(null); setForm(EMPTY_FORM); setMode("create"); }}>Create a new profile</Button></div></Card>}</div>;
+  const goToStep = (index) => {
+    setCurrentStep(Math.min(Math.max(index, 0), Math.max(sectionsCount - 1, 0)));
+    window.scrollTo({ top: 0 });
+  };
 
-  return <div>
-    <div className="mb-7"><h1 className="text-[30px] mb-3">Check your eligibility</h1><p className="max-w-[66ch] mb-5">Complete a short profile. The backend EligibilityEngine will evaluate it against the active scheme rules.</p><div className="flex items-center gap-2 text-xs font-mono text-ink-soft" aria-label={`Step ${step + 1} of ${STEPS.length}`}><span>STEP {step + 1} OF {STEPS.length}</span><div className="flex-1 h-1 bg-line max-w-65" aria-hidden="true"><div className="h-1 bg-accent" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} /></div></div></div>
-    {message && <div className="mb-5"><ErrorState title="Unable to continue" message={message} /></div>}
-    <form onSubmit={submit} noValidate><Card><div className="border-b border-line pb-4 mb-6"><p className="font-mono text-xs text-accent-ink mb-1">SECTION {step + 1}</p><h2 className="text-2xl mb-0">{STEPS[step]}</h2></div>
-      {step === 0 && <div className="grid md:grid-cols-2 gap-x-5"><Input id="full-name" label="Full name" required value={form.full_name} onChange={(event) => update("full_name", event.target.value)} error={errors.full_name} autoComplete="name" /><Input id="date-of-birth" label="Date of birth" required type="date" max={TODAY} value={form.date_of_birth} onChange={(event) => update("date_of_birth", event.target.value)} error={errors.date_of_birth} /><Select id="gender" label="Gender" value={form.gender} onChange={(event) => update("gender", event.target.value)}><option value="">Prefer not to say</option><option value="MALE">Male</option><option value="FEMALE">Female</option><option value="OTHER">Other</option></Select><Select id="citizen-type" label="Citizen type" required value={form.citizen_type} onChange={(event) => update("citizen_type", event.target.value)} error={errors.citizen_type}>{CITIZEN_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></div>}
-      {step === 1 && <div className="grid md:grid-cols-2 gap-x-5"><Select id="education-level" label="Education level" value={form.education_level} onChange={(event) => update("education_level", event.target.value)}><option value="">Not provided</option><option value="ILLITERATE">Illiterate</option><option value="PRIMARY">Primary</option><option value="SECONDARY">Secondary (10th)</option><option value="HIGHER_SECONDARY">Higher Secondary (12th)</option><option value="GRADUATE">Graduate</option><option value="POST_GRADUATE">Post Graduate</option></Select><Input id="occupation" label="Occupation" value={form.occupation} onChange={(event) => update("occupation", event.target.value)} /><Select id="employment-status" label="Employment status" value={form.employment_status} onChange={(event) => update("employment_status", event.target.value)}><option value="">Not provided</option><option value="EMPLOYED">Employed</option><option value="UNEMPLOYED">Unemployed</option><option value="SELF_EMPLOYED">Self-employed</option><option value="FARMER">Farmer</option><option value="STUDENT">Student</option><option value="RETIRED">Retired</option></Select><p className="text-xs text-ink-soft mt-2">Optional profile information; eligibility is decided by backend rules.</p></div>}
-      {step === 2 && <div className="grid md:grid-cols-2 gap-x-5"><Input id="annual-income" label="Annual family income (INR)" type="number" min="0" step="0.01" value={form.annual_income} onChange={(event) => update("annual_income", event.target.value)} error={errors.annual_income} hint="Optional" /><Input id="land-holding-size" label="Land holding size (hectares)" type="number" min="0" step="0.01" value={form.land_holding_size} onChange={(event) => update("land_holding_size", event.target.value)} error={errors.land_holding_size} hint="Optional; useful for farmer profiles" /><Select id="poverty-category" label="Poverty category" value={form.poverty_category} onChange={(event) => update("poverty_category", event.target.value)}><option value="">Not provided</option><option value="APL">APL</option><option value="BPL">BPL</option><option value="AAY">AAY</option></Select><div className="space-y-3 mb-5 md:mt-8"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_bpl_card_holder} onChange={(event) => update("is_bpl_card_holder", event.target.checked)} /> BPL card holder</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_income_tax_payer} onChange={(event) => update("is_income_tax_payer", event.target.checked)} /> Income-tax payer</label></div></div>}
-      {step === 3 && <div className="grid md:grid-cols-2 gap-x-5"><Select id="social-category" label="Social category" value={form.social_category} onChange={(event) => update("social_category", event.target.value)}><option value="">Not provided</option><option value="GEN">General</option><option value="OBC">OBC</option><option value="SC">SC</option><option value="ST">ST</option></Select><Select id="disability-status" label="Disability status" value={form.disability_status} onChange={(event) => update("disability_status", event.target.value)}><option value="NONE">None</option><option value="PHYSICALLY_DISABLED">Physically disabled</option><option value="VISUALLY_IMPAIRED">Visually impaired</option><option value="HEARING_IMPAIRED">Hearing impaired</option><option value="OTHER">Other</option></Select><Input id="family-size" label="Family size" type="number" min="1" max="50" step="1" value={form.family_size} onChange={(event) => update("family_size", event.target.value)} error={errors.family_size} hint="Optional; 1 to 50 people" /><Select id="marital-status" label="Marital status" value={form.marital_status} onChange={(event) => update("marital_status", event.target.value)}><option value="">Not provided</option><option value="SINGLE">Single</option><option value="MARRIED">Married</option><option value="WIDOWED">Widowed</option><option value="DIVORCED">Divorced</option></Select></div>}
-      {step === 4 && <div className="grid md:grid-cols-2 gap-x-5"><Input id="state" label="State" value={form.state} onChange={(event) => update("state", event.target.value)} /><Input id="district" label="District" value={form.district} onChange={(event) => update("district", event.target.value)} /><Input id="village-city" label="Village / city" value={form.village_city} onChange={(event) => update("village_city", event.target.value)} /><Select id="area-type" label="Area type" value={form.area_type} onChange={(event) => update("area_type", event.target.value)}><option value="">Not provided</option><option value="RURAL">Rural</option><option value="URBAN">Urban</option><option value="SEMI_URBAN">Semi-Urban</option></Select></div>}
-      {step === 5 && <div><div className="flex items-center gap-2 mb-5 text-sm text-ok-ink"><Check className="h-4 w-4" aria-hidden="true" /> Review your information before creating the profile.</div><dl className="border border-line px-4"><Summary label="Name" value={form.full_name} /><Summary label="Date of birth" value={form.date_of_birth} /><Summary label="Citizen type" value={CITIZEN_TYPES.find(([value]) => value === form.citizen_type)?.[1]} /><Summary label="Education / work" value={[form.education_level, form.occupation, form.employment_status].filter(Boolean).join(" · ")} /><Summary label="Financial" value={[form.annual_income && `INR ${form.annual_income}`, form.poverty_category, form.land_holding_size && `${form.land_holding_size} ha`].filter(Boolean).join(" · ")} /><Summary label="Social / family" value={[form.social_category, form.disability_status !== "NONE" && form.disability_status, form.family_size && `${form.family_size} people`].filter(Boolean).join(" · ")} /><Summary label="Location" value={[form.village_city, form.district, form.state, form.area_type].filter(Boolean).join(" · ")} /></dl></div>}
-      <div className="flex flex-wrap justify-between gap-3 mt-7 pt-5 border-t border-line"><Button type="button" variant="ghost" onClick={() => setStep((current) => Math.max(current - 1, 0))} disabled={step === 0 || submitting}><ChevronLeft className="h-4 w-4" aria-hidden="true" /> Back</Button>{step < STEPS.length - 1 ? <Button type="button" onClick={next}>Next <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button> : <Button type="submit" disabled={submitting}>{submitting ? "Creating and checking..." : "Create profile and check eligibility"}</Button>}</div>
-    </Card></form>
-  </div>;
+  const saveProgress = async () => {
+    setSaveState("saving");
+    setMessage("");
+    try {
+      // Hidden (conditionally inapplicable) questions are never sent — the
+      // visibility map is recomputed from the exact answers being saved.
+      const nowApplicable = computeApplicableMap(form.sections, answersRef.current);
+      const payload = answersPayload(answersRef.current).filter((a) => nowApplicable.get(a.question_id, true));
+      const response = await formSubmissionService.update(submission.submission_id, {
+        citizen_id: identity.citizenId,
+        answers: payload,
+      });
+      setSubmission(response.data);
+      setSaveState("saved");
+      setAnswers(storedAnswersByQuestionId(response.data));
+      return true;
+    } catch (error) {
+      setSaveState("idle");
+      setMessage(backendErrorMessage(error, form?.sections || []));
+      return false;
+    }
+  };
+
+  const saveAndContinue = async () => {
+    const saved = await saveProgress();
+    if (saved) goToStep(currentStep + 1);
+  };
+
+  const submitAll = async () => {
+    setPhase("submitting");
+    setMessage("");
+    try {
+      await saveProgress();
+      try {
+        await formSubmissionService.complete(submission.submission_id, { citizen_id: identity.citizenId });
+      } catch (error) {
+        const detail = error?.response?.data?.detail ?? {};
+        const missing = detail.missing_required || [];
+        if (missing.length > 0 && form) {
+          const nextErrors = new Map();
+          let target = -1;
+          form.sections.forEach((section, index) => {
+            for (const question of section.questions) {
+              if (missing.includes(question.question_code) && applicable.get(question.question_id, true)) {
+                nextErrors.set(question.question_id, "This answer is required.");
+                if (target < 0) target = index;
+              }
+            }
+          });
+          setFieldErrors(nextErrors);
+          setPhase("form");
+          goToStep(target >= 0 ? target : 0);
+          setMessage("Some required answers are still missing. They are marked below.");
+          return;
+        }
+        throw error;
+      }
+      setPhase("normalizing");
+      await formSubmissionService.normalize(submission.submission_id, { citizen_id: identity.citizenId });
+      // Existing eligibility flow: the results page reads stored assessments,
+      // so evaluate (backend engine, unchanged) before navigating.
+      setPhase("evaluating");
+      await eligibilityService.evaluate(identity.citizenId);
+      navigate(`/results/${identity.citizenId}`);
+    } catch (error) {
+      setPhase("form");
+      setMessage(backendErrorMessage(error, form?.sections || []));
+    }
+  };
+
+  // ---------------- first-time registration (no auth exists yet) ----------------
+  const [regForm, setRegForm] = useState({ full_name: "", date_of_birth: "", gender: "" });
+  const [regError, setRegError] = useState("");
+  const register = async (event) => {
+    event.preventDefault();
+    setRegError("");
+    if (regForm.full_name.trim().length < 2 || !regForm.date_of_birth || regForm.date_of_birth >= TODAY) {
+      setRegError("Please enter your full name and a date of birth in the past.");
+      return;
+    }
+    try {
+      const response = await citizenService.register({
+        full_name: regForm.full_name.trim(),
+        date_of_birth: regForm.date_of_birth,
+        gender: regForm.gender || null,
+        citizen_type: "GENERAL",
+        demographic: { disability_status: "NONE" },
+        financial: { is_bpl_card_holder: false, is_income_tax_payer: false },
+        location: {},
+      });
+      const citizenId = response.data.citizen_id;
+      setStoredCitizenId(citizenId);
+      setIdentity({
+        citizenId,
+        fullName: response.data.full_name,
+        dateOfBirth: response.data.date_of_birth,
+        gender: response.data.gender,
+      });
+      // The form definition is already in state (loaded in parallel with the
+      // citizen check) — no second fetch, no second identity step.
+      setPhase("form");
+    } catch {
+      setRegError("Unable to create your profile right now. Please try again.");
+    }
+  };
+
+  // ---------------- review data ----------------
+  const reviewSections = useMemo(() => {
+    if (!form) return [];
+    return form.sections
+      .map((section) => ({
+        section,
+        items: section.questions
+          .filter((q) => applicable.get(q.question_id, true))
+          .map((q) => ({ question: q, value: answers.get(q.question_id) ?? null })),
+      }))
+      .filter((entry) => entry.items.length > 0);
+  }, [form, answers, applicable]);
+
+  // ---------------- renders ----------------
+  if (phase === "loading") return <LoadingState label="Loading your profile..." />;
+
+  if (phase === "form-error") {
+    return (
+      <ErrorState
+        title="Unable to load the form"
+        message="The form service is not responding right now. Anything you already saved is safe — please try again."
+        onRetry={() => {
+          setForm(null);
+          setSubmission(null);
+          setPhase("loading");
+          // Re-run the combined citizen+form load in place (no full page
+          // reload — the local context is fine, the fetch just failed).
+          setLoadKey((key) => key + 1);
+        }}
+      />
+    );
+  }
+
+  if (phase === "no-citizen") {
+    return (
+      <div>
+        <div className="mb-7">
+          <h1 className="text-[30px] mb-3">Check your eligibility</h1>
+          <p className="max-w-[66ch] mb-5">
+            First create your citizen profile, then answer a short set of questions. We use your answers only to work
+            out which government schemes you may be eligible for.
+          </p>
+        </div>
+        <Card>
+          <form onSubmit={register} noValidate>
+            <div className="grid md:grid-cols-2 gap-x-5">
+              <Input
+                id="reg-name"
+                label="Full name"
+                required
+                value={regForm.full_name}
+                autoComplete="name"
+                onChange={(event) => setRegForm((current) => ({ ...current, full_name: event.target.value }))}
+              />
+              <Input
+                id="reg-dob"
+                label="Date of birth"
+                required
+                type="date"
+                max={TODAY}
+                value={regForm.date_of_birth}
+                error={regError || undefined}
+                onChange={(event) => setRegForm((current) => ({ ...current, date_of_birth: event.target.value }))}
+              />
+              <Select
+                id="reg-gender"
+                label="Gender"
+                value={regForm.gender}
+                onChange={(event) => setRegForm((current) => ({ ...current, gender: event.target.value }))}
+              >
+                <option value="">Prefer not to say</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+                <option value="OTHER">Other</option>
+              </Select>
+            </div>
+            <div className="flex justify-end mt-4 pt-5 border-t border-line">
+              <Button type="submit">Create profile and continue</Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+    );
+  }
+
+  if (phase === "review") {
+    return (
+      <div>
+        <div className="mb-7">
+          <h1 className="text-[30px] mb-3">Review your information</h1>
+          <p className="max-w-[66ch]">Check everything below. Use Edit to go back to any section.</p>
+        </div>
+        {message && (
+          <div className="mb-5">
+            <ErrorState title="Unable to continue" message={message} />
+          </div>
+        )}
+        <ReviewStep reviewSections={reviewSections} onEdit={goToStep} />
+        <div className="flex flex-wrap justify-between gap-3 mt-7 pt-5 border-t border-line">
+          <Button type="button" variant="ghost" onClick={() => setPhase("form")}>
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Back to form
+          </Button>
+          <Button onClick={submitAll} disabled={phase !== "review"}>
+            Submit and check eligibility
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "submitting" || phase === "normalizing" || phase === "evaluating") {
+    return (
+      <LoadingState
+        label={phase === "submitting" ? "Submitting your answers..." : phase === "normalizing" ? "Organising your information..." : "Checking schemes for you..."}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-7">
+        <h1 className="text-[30px] mb-3">{form?.form_name || "Check your eligibility"}</h1>
+        <p className="max-w-[66ch] mb-3">
+          {form?.description || "Answer the questions below. Your progress is saved as you go."}
+        </p>
+        {identity && (
+          <p className="text-xs text-ink-soft mb-5">
+            Answering as <span className="text-ink font-medium">{identity.fullName}</span>
+            {identity.dateOfBirth ? ` · DOB ${identity.dateOfBirth}` : ""} — this was set when you created your
+            profile and is not asked again here.
+          </p>
+        )}
+        {form && submission && (
+          <FormProgress
+            sections={form.sections}
+            currentStep={currentStep}
+            applicable={applicable}
+            answers={answers}
+            completionPercentage={Math.max(submission.completion_percentage ?? 0, completion)}
+          />
+        )}
+      </div>
+      {message && (
+        <div className="mb-5">
+          <ErrorState title="Unable to continue" message={message} />
+        </div>
+      )}
+      {form && currentSection && submission && (
+        <Card>
+          <FormSection
+            section={currentSection}
+            answers={answers}
+            applicable={applicable}
+            onAnswerChange={answerQuestion}
+            fieldErrors={fieldErrors}
+            sectionIndex={currentStep}
+            totalSections={sectionsCount}
+          />
+          <div className="flex flex-wrap justify-between items-center gap-3 mt-7 pt-5 border-t border-line">
+            <Button type="button" variant="ghost" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 0}>
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Back
+            </Button>
+            <div className="flex items-center gap-3">
+              {saveState === "saving" && (
+                <span className="text-xs text-ink-soft flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Saving...
+                </span>
+              )}
+              {saveState === "saved" && (
+                <span className="text-xs text-ok-ink flex items-center gap-1">
+                  <Check className="h-3 w-3" aria-hidden="true" /> Progress saved
+                </span>
+              )}
+              <Button type="button" variant="secondary" onClick={saveProgress} disabled={saveState === "saving"}>
+                Save draft
+              </Button>
+              {currentStep < sectionsCount - 1 ? (
+                <Button onClick={saveAndContinue}>
+                  Save &amp; continue <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              ) : (
+                <Button onClick={() => setPhase("review")}>Review &amp; submit</Button>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
 }

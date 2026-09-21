@@ -32,20 +32,19 @@ async def evaluate_citizen_eligibility(
     if not citizen:
         raise HTTPException(status_code=404, detail="Citizen not found")
 
-    schemes = await scheme_repo.get_all_active()
-    assessments = []
+    schemes = await scheme_repo.get_all_active_for_evaluation()
+    assessment_rows = []
 
     for scheme in schemes:
         overall_result, evaluation_details, reason = engine.evaluate_scheme(citizen, scheme)
-        
-        # Save assessment to DB
-        assessment = await assessment_repo.upsert_assessment(
-            citizen_id=citizen.citizen_id,
-            scheme_id=scheme.scheme_id,
-            eligibility_result=overall_result,
-            reason=reason,
-            evaluation_details=evaluation_details,
+        assessment_rows.append(
+            {
+                "citizen_id": citizen.citizen_id,
+                "scheme_id": scheme.scheme_id,
+                "eligibility_result": overall_result,
+                "reason": reason,
+                "evaluation_details": evaluation_details,
+            }
         )
-        assessments.append(assessment)
 
-    return assessments
+    return await assessment_repo.upsert_assessments(assessment_rows)

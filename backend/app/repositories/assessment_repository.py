@@ -54,6 +54,35 @@ class AssessmentRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one()
 
+    async def upsert_assessments(
+        self,
+        assessments: list[dict[str, Any]],
+    ) -> Sequence[EligibilityAssessment]:
+        """Persist a citizen's evaluation results in one PostgreSQL upsert.
+
+        Eligibility evaluates every active scheme together.  Sending one
+        insert per scheme made the write path sequential even though all
+        rows share the same conflict target and transaction.  This preserves
+        the existing latest-assessment semantics and response shape while
+        reducing those database round trips to one statement.
+        """
+        if not assessments:
+            return []
+
+        stmt = insert(EligibilityAssessment).values(assessments)
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_citizen_scheme_assessment",
+            set_={
+                "eligibility_result": stmt.excluded.eligibility_result,
+                "reason": stmt.excluded.reason,
+                "evaluation_details": stmt.excluded.evaluation_details,
+                "assessment_date": stmt.excluded.assessment_date,
+            },
+        ).returning(EligibilityAssessment)
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
     async def get_citizen_assessments(
         self, citizen_id: uuid.UUID
     ) -> Sequence[EligibilityAssessment]:

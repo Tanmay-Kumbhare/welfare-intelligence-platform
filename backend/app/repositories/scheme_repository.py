@@ -9,7 +9,7 @@ from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.models.scheme import SchemeMaster
 
@@ -45,3 +45,22 @@ class SchemeRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_all_active_for_evaluation(self) -> Sequence[SchemeMaster]:
+        """Fetch only the rule graph required by the eligibility engine.
+
+        Documents are presentation/application requirements and are not read
+        while evaluating a citizen.  Joining the small current rule graph
+        avoids separate scheme, group, and rule round trips; ``unique``
+        restores one ORM scheme object per joined result set.
+        """
+        result = await self.db.execute(
+            select(SchemeMaster)
+            .where(SchemeMaster.status == "ACTIVE")
+            .options(
+                joinedload(SchemeMaster.rule_groups).joinedload(
+                    SchemeMaster.rule_groups.property.mapper.class_.rules
+                )
+            )
+        )
+        return result.unique().scalars().all()

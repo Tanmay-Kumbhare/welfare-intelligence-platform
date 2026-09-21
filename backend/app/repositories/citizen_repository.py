@@ -63,6 +63,16 @@ class CitizenRepository:
         )
         return result.scalar_one_or_none()
 
+    async def exists(self, citizen_id: uuid.UUID) -> bool:
+        """Lean existence check — identity columns only, no relationship
+        loading. Used by flows that only need to verify the citizen row."""
+        result = await self.db.execute(
+            select(CitizenMaster.citizen_id).where(
+                CitizenMaster.citizen_id == citizen_id
+            ).limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def get_full_profile(self, citizen_id: uuid.UUID) -> Optional[CitizenMaster]:
         """
         Fetch a citizen with all sub-profiles and assessments.

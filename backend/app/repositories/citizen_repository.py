@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.models.citizen import CitizenMaster, DemographicProfile, FinancialProfile, LocationProfile
-from app.schemas.citizen import CitizenCreate
+from app.schemas.citizen import CitizenCreate, CitizenUpdate
 
 
 class CitizenRepository:
@@ -72,6 +72,30 @@ class CitizenRepository:
             ).limit(1)
         )
         return result.scalar_one_or_none() is not None
+
+    async def update(self, citizen_id: uuid.UUID, data: CitizenUpdate) -> Optional[CitizenMaster]:
+        """Update the existing authoritative citizen and one-to-one profiles."""
+        citizen = await self.get_by_id(citizen_id)
+        if citizen is None:
+            return None
+        for field in (
+            "full_name", "date_of_birth", "gender", "mobile_number",
+            "email_id", "citizen_type",
+        ):
+            setattr(citizen, field, getattr(data, field))
+        for profile, values in (
+            (citizen.demographic_profile, data.demographic.model_dump()),
+            (citizen.financial_profile, data.financial.model_dump()),
+            (citizen.location_profile, data.location.model_dump()),
+        ):
+            # Registration always creates all three rows. Keeping this guard
+            # makes edits resilient to a legacy incomplete record without
+            # creating a second citizen identity.
+            if profile is not None:
+                for field, value in values.items():
+                    setattr(profile, field, value)
+        await self.db.flush()
+        return citizen
 
     async def get_full_profile(self, citizen_id: uuid.UUID) -> Optional[CitizenMaster]:
         """

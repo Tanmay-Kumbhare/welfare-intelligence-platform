@@ -65,6 +65,14 @@ class CitizenCreate(BaseModel):
         return v
 
 
+class CitizenUpdate(CitizenCreate):
+    """Validated replacement of one existing citizen and its three profiles.
+
+    The endpoint deliberately updates the row addressed by ``citizen_id``;
+    it never routes an edit through registration or identity matching.
+    """
+
+
 # ------------------------------------------------------------------
 # Response schemas
 # ------------------------------------------------------------------

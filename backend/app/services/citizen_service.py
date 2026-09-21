@@ -13,6 +13,7 @@ from app.models.citizen import CitizenMaster
 from app.repositories.citizen_repository import CitizenRepository
 from app.schemas.citizen import (
     CitizenCreate,
+    CitizenUpdate,
     CitizenResponse,
     DemographicProfileResponse,
     FinancialProfileResponse,
@@ -59,4 +60,10 @@ class CitizenService:
 
     async def get_citizen(self, citizen_id: uuid.UUID) -> Optional[CitizenResponse]:
         citizen = await self.repo.get_by_id(citizen_id)
+        return _to_response(citizen) if citizen else None
+
+    async def update_citizen(
+        self, citizen_id: uuid.UUID, data: CitizenUpdate
+    ) -> Optional[CitizenResponse]:
+        citizen = await self.repo.update(citizen_id, data)
         return _to_response(citizen) if citizen else None

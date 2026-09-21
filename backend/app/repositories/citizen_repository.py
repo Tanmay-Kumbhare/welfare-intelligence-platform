@@ -10,7 +10,7 @@ from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.models.citizen import CitizenMaster, DemographicProfile, FinancialProfile, LocationProfile
 from app.schemas.citizen import CitizenCreate
@@ -82,9 +82,13 @@ class CitizenRepository:
             select(CitizenMaster)
             .where(CitizenMaster.citizen_id == citizen_id)
             .options(
-                selectinload(CitizenMaster.demographic_profile),
-                selectinload(CitizenMaster.financial_profile),
-                selectinload(CitizenMaster.location_profile),
+                # These are one-to-one relationships. Joining them keeps the
+                # eligibility read to one query without multiplying rows.
+                joinedload(CitizenMaster.demographic_profile),
+                joinedload(CitizenMaster.financial_profile),
+                joinedload(CitizenMaster.location_profile),
+                # Open profile facts (AGE etc.) consumed by the engine.
+                selectinload(CitizenMaster.profile_facts),
             )
         )
         return result.scalar_one_or_none()

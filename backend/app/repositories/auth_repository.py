@@ -59,7 +59,7 @@ class AuthRepository:
         result = await self.db.execute(
             select(UserRole.role).where(UserRole.user_id == user_id)
         )
-        return list(result.scalars().all())
+        return [row.role for row in result.scalars().all()]
 
     async def find_session_by_token(self, token_hash: str) -> UserSession | None:
         result = await self.db.execute(

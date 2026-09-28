@@ -149,10 +149,6 @@ class AuthService:
     async def get_citizen_for_user(self, user: UserAccount) -> CitizenMaster | None:
         return await self.citizens.get_by_owning_user(user.user_id)
 
-    async def get_roles_for_user(self, user: UserAccount) -> list[str]:
-        """Role names for the authenticated user (e.g. ["CITIZEN", "ADMIN"])."""
-        return await self.users.get_roles(user.user_id)
-
     async def _create_citizen_profile(
         self,
         user_id: uuid.UUID,

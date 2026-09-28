@@ -52,7 +52,6 @@ class TokenResponse(BaseModel):
     token: str
     user_id: uuid.UUID
     email: str
-    roles: list[str] = []
 
 
 class MeResponse(BaseModel):
@@ -60,7 +59,6 @@ class MeResponse(BaseModel):
     email: str
     citizen_id: uuid.UUID | None = None
     citizen_name: str | None = None
-    roles: list[str] = []
 
 
 def _citizen_body_from_create(citizen_create: CitizenCreate) -> dict:
@@ -94,12 +92,10 @@ async def register(
 
     # Issue the first token after account + owned citizen profile are created.
     user, token = await service.login(body.email, body.password)
-    roles = await service.get_roles_for_user(user)
     return TokenResponse(
         token=token,
         user_id=user.user_id,
         email=user.email,
-        roles=roles,
     )
 
 
@@ -114,14 +110,10 @@ async def login(
     except InvalidCredentialsError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
-    # Roles ride along with the token response so the frontend can route
-    # admins to /admin immediately without a second request.
-    roles = await service.get_roles_for_user(user)
     return TokenResponse(
         token=token,
         user_id=user.user_id,
         email=user.email,
-        roles=roles,
     )
 
 
@@ -138,13 +130,11 @@ async def me(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
     citizen = await service.get_citizen_for_user(user)
-    roles = await service.get_roles_for_user(user)
     return MeResponse(
         user_id=user.user_id,
         email=user.email,
         citizen_id=citizen.citizen_id if citizen is not None else None,
         citizen_name=citizen.full_name if citizen is not None else None,
-        roles=roles,
     )
 
 

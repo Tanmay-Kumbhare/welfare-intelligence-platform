@@ -1,15 +1,46 @@
 import axios from "axios";
 
+import { attachAuthHeaders } from "./auth";
+
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 const api = axios.create({
   baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
+// Auto-attach auth headers to any request that goes through the main api
+// client. Public endpoints still work; protected endpoints receive the
+// current token automatically.
+api.interceptors.request.use(attachAuthHeaders);
+
+// Auth-specific client keeps its own interceptors separate so login/register
+// requests never get polluted by a stale token.
+export const authApi = axios.create({
+  baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// NOTE: me/logout go through the main `api` client so the Authorization
+// header is attached automatically. Only register/login use `authApi`.
+
+// Public scheme catalogue is still open for browsing.
+// Authenticated user-scoped endpoints are added below.
 export const citizenService = {
   register: (data) => api.post("/citizens/", data),
   get: (id) => api.get(`/citizens/${id}`),
   update: (id, data) => api.put(`/citizens/${id}`, data),
+};
+
+export const authService = {
+  register: (data) => authApi.post("/auth/register", data),
+  login: (data) => authApi.post("/auth/login", data),
+  me: () => api.get("/auth/me"),
+  logout: () => api.post("/auth/logout"),
 };
 
 export const schemeService = {

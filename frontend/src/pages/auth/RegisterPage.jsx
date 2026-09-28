@@ -101,9 +101,9 @@ export default function RegisterPage() {
         },
       });
 
-      const { token, user_id, email: loggedInEmail } = response.data;
+      const { token, user_id, email: loggedInEmail, roles } = response.data;
       saveToken(token);
-      saveUser({ user_id, email: loggedInEmail });
+      saveUser({ user_id, email: loggedInEmail, roles: roles || [] });
       navigate("/profile");
       return;
     } catch (requestError) {

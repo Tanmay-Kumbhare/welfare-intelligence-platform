@@ -6,10 +6,12 @@ from app.api.v1.schemes import router as schemes_router
 from app.api.v1.eligibility import router as eligibility_router
 from app.api.v1.forms import router as forms_router
 from app.api.v1.recommendations import router as recommendations_router
+from app.api.v1.admin import router as admin_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
+api_router.include_router(admin_router, prefix="/admin", tags=["Admin"])
 api_router.include_router(citizens_router, prefix="/citizens", tags=["Citizens"])
 api_router.include_router(schemes_router, prefix="/schemes", tags=["Schemes"])
 api_router.include_router(eligibility_router, prefix="/eligibility", tags=["Eligibility"])

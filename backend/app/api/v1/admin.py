@@ -16,6 +16,12 @@ Groups:
   GET/POST/PATCH /admin/sources[...]      source registry CRUD
   POST  /admin/sources/{id}/fetch         manual ingestion (raw snapshot)
   GET   /admin/ingestion-runs[/{id}]      run monitoring + snapshot viewer
+  GET   /admin/schemes/{id}/rules-with-provenance   rules + citations
+  GET   /admin/provenance/schemes/{id}/latest-document-sentences  scheme's latest snapshot sentences
+  GET   /admin/provenance/documents/{id}/sentences  browse/search sentences
+  POST  /admin/provenance/rules/{id}/link           cite a source sentence
+  DELETE /admin/provenance/rules/{id}/links/{pid}   remove a citation
+  POST  /admin/provenance/rules/{id}/links/{pid}/verify   verify citation
 """
 
 from __future__ import annotations
@@ -46,6 +52,7 @@ from app.models.scheme_source import (
 from app.repositories.auth_repository import KNOWN_ROLES
 from app.services.auth_service import AuthService
 from app.services.ingestion_service import IngestionError, run_manual_fetch
+from app.services.rule_provenance_service import ProvenanceError, RuleProvenanceService
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -804,3 +811,145 @@ async def admin_run_detail(
         documents=documents,
         contents=contents,
     )
+
+
+# ------------------------------------------------------------------
+# Rule provenance (snapshot → sentence → cited rule)
+# ------------------------------------------------------------------
+
+
+class SentenceSearchQuery(BaseModel):
+    query: str | None = None
+
+
+@router.get("/schemes/{scheme_id}/rules-with-provenance")
+async def admin_rules_with_provenance(
+    scheme_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Every rule of the scheme with its source citation, if linked."""
+    scheme = await db.get(SchemeMaster, scheme_id)
+    if scheme is None:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    service = RuleProvenanceService(db)
+    return {"scheme_id": scheme_id, "rules": await service.provenance_for_scheme(scheme_id)}
+
+
+@router.get("/provenance/schemes/{scheme_id}/latest-document-sentences")
+async def admin_latest_document_sentences(
+    scheme_id: uuid.UUID,
+    query: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Sentences of the scheme's latest snapshot document (its linked
+    document if any, else the newest snapshot from an ACTIVE source),
+    optionally filtered by an all-terms query. Feeds the citation picker."""
+    scheme = await db.get(SchemeMaster, scheme_id)
+    if scheme is None:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    service = RuleProvenanceService(db)
+    document = await service.latest_document_for_scheme(scheme_id)
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No snapshot document available. Fetch a source first.",
+        )
+    try:
+        result = await service.document_sentences(document.source_document_id, query)
+    except ProvenanceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return {
+        **result,
+        "document_name": document.document_name,
+        "document_url": document.document_url,
+        "retrieved_at": document.retrieved_at,
+    }
+
+
+@router.get("/provenance/documents/{source_document_id}/sentences")
+async def admin_document_sentences(
+    source_document_id: uuid.UUID,
+    query: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Sentences extracted from a snapshot document (deterministic
+    segmentation), optionally filtered by an all-terms query."""
+    service = RuleProvenanceService(db)
+    try:
+        return await service.document_sentences(source_document_id, query)
+    except ProvenanceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+
+@router.post("/provenance/documents/{source_document_id}/search")
+async def admin_search_document_sentences(
+    source_document_id: uuid.UUID,
+    body: SentenceSearchQuery,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Term-overlap search over the document's sentences (for the citation
+    picker; GET with ?query= is equivalent)."""
+    service = RuleProvenanceService(db)
+    try:
+        return await service.document_sentences(source_document_id, body.query)
+    except ProvenanceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+
+@router.post("/provenance/rules/{rule_id}/link")
+async def admin_link_rule_provenance(
+    rule_id: uuid.UUID,
+    body: SentenceSearchQuery,
+    source_document_id: uuid.UUID,
+    sentence_index: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Cite a snapshot sentence as the source of a rule (MANUAL, PENDING)."""
+    service = RuleProvenanceService(db)
+    try:
+        provenance = await service.link_rule(
+            rule_id, source_document_id, sentence_index
+        )
+    except ProvenanceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return {
+        "rule_provenance_id": provenance.rule_provenance_id,
+        "rule_id": rule_id,
+        "source_document_id": source_document_id,
+        "sentence_index": sentence_index,
+        "source_text": provenance.source_text,
+        "verification_status": provenance.verification_status,
+    }
+
+
+@router.delete("/provenance/rules/{rule_id}/links/{provenance_id}")
+async def admin_unlink_rule_provenance(
+    rule_id: uuid.UUID,
+    provenance_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    service = RuleProvenanceService(db)
+    try:
+        await service.unlink_rule(rule_id, provenance_id)
+    except ProvenanceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return {"unlinked": True, "rule_id": rule_id, "provenance_id": provenance_id}
+
+
+@router.post("/provenance/rules/{rule_id}/links/{provenance_id}/verify")
+async def admin_verify_rule_provenance(
+    rule_id: uuid.UUID,
+    provenance_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Mark a citation as admin-verified (timestamped)."""
+    service = RuleProvenanceService(db)
+    try:
+        provenance = await service.verify_rule_link(rule_id, provenance_id)
+    except ProvenanceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return {
+        "rule_provenance_id": provenance.rule_provenance_id,
+        "verification_status": provenance.verification_status,
+        "verified_at": provenance.verified_at,
+    }

@@ -25,6 +25,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Citizen area: shared Layout with the citizen Header/Footer. */}
         <Route element={<Layout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -43,19 +44,22 @@ function App() {
             </Route>
           </Route>
 
-          {/* Admin area: own sidebar layout, gated by AdminGate (UX) and
-              require_admin on every backend endpoint (real security). */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminOverviewPage />} />
-            <Route path="users" element={<AdminUsersPage />} />
-            <Route path="schemes" element={<AdminSchemesPage />} />
-            <Route path="submissions" element={<AdminSubmissionsPage />} />
-            <Route path="sources" element={<AdminSourcesPage />} />
-          </Route>
-
           <Route path="/check-eligibility" element={<CheckEligibilityPage />} />
-          <Route path="*" element={<NotFoundPage />} />
         </Route>
+
+        {/* Admin area: completely separate shell — its own header, sidebar
+            and nav. Gated by AdminGate (UX) and require_admin on every
+            backend endpoint (real security). Deliberately NOT nested in the
+            citizen Layout so citizen navigation never appears here. */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminOverviewPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="schemes" element={<AdminSchemesPage />} />
+          <Route path="submissions" element={<AdminSubmissionsPage />} />
+          <Route path="sources" element={<AdminSourcesPage />} />
+        </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

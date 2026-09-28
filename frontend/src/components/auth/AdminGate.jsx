@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
 import Button from "../ui/Button";
 import { ErrorState, LoadingState } from "../ui/StatusStates";
 import { authService } from "../../services/api";
@@ -10,8 +9,12 @@ import { getUser, saveUser } from "../../services/auth";
  * backend require_admin dependency (403 for citizens) — this gate just
  * renders a friendly "not authorized" state instead of letting admins-only
  * pages fail on their first API call.
+ *
+ * Usage: wrap the admin layout component with it (<AdminGate><AdminLayout/>
+ * </AdminGate>). When authorized it renders `children` — NOT <Outlet/> —
+ * so the layout markup itself is preserved.
  */
-export default function AdminGate() {
+export default function AdminGate({ children }) {
   const [status, setStatus] = useState("loading"); // loading | admin | forbidden
 
   useEffect(() => {
@@ -48,5 +51,5 @@ export default function AdminGate() {
     );
   }
 
-  return <Outlet />;
+  return children;
 }

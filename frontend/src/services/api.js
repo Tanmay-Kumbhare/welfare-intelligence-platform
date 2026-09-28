@@ -74,4 +74,8 @@ export const formSubmissionService = {
     api.post(`/forms/submissions/${submissionId}/normalize`, data),
 };
 
+// Named export too, so feature pages can `import { api } from "../../services/api"`
+// without rebinding the default.
+export { api };
+
 export default api;

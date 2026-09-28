@@ -6,7 +6,7 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
 import { ErrorState, LoadingState } from "../components/ui/StatusStates";
-import { citizenService, eligibilityService, formService, formSubmissionService } from "../services/api";
+import { authService, citizenService, eligibilityService, formService, formSubmissionService } from "../services/api";
 import { clearStoredCitizenId, getStoredCitizenId, setStoredCitizenId } from "../utils/citizenStorage";
 import FormSection from "../components/forms/FormSection";
 import FormProgress from "../components/forms/FormProgress";
@@ -51,18 +51,32 @@ export default function CheckEligibilityPage() {
   // for identity (never re-asked inside the form).
   useEffect(() => {
     let cancelled = false;
-    const stored = getStoredCitizenId();
-    const citizenPromise = stored
-      ? citizenService
-          .get(stored)
-          .then((response) => response.data)
-          .catch(() => {
-            clearStoredCitizenId();
-            return null;
-          })
-      : Promise.resolve(null);
+    // Resolve which citizen record to answer for: prefer the authenticated
+    // user's owned profile (never re-asks anything); fall back to the legacy
+    // localStorage pointer for guests of the old flow.
+    const loadCitizen = async () => {
+      try {
+        const me = await authService.me();
+        const citizenId = me.data?.citizen_id;
+        if (citizenId) {
+          const response = await citizenService.get(citizenId);
+          return response.data;
+        }
+      } catch {
+        // Not signed in (or /me failed) — fall through to the legacy pointer.
+      }
+      const stored = getStoredCitizenId();
+      if (!stored) return null;
+      try {
+        const response = await citizenService.get(stored);
+        return response.data;
+      } catch {
+        clearStoredCitizenId();
+        return null;
+      }
+    };
 
-    Promise.all([citizenPromise, formService.getActive(FORM_CODE)])
+    Promise.all([loadCitizen(), formService.getActive(FORM_CODE)])
       .then(([citizen, formResponse]) => {
         if (cancelled) return;
         setForm(formResponse.data);

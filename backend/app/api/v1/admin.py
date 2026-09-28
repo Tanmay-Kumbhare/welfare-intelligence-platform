@@ -13,9 +13,9 @@ Groups:
   GET   /admin/submissions                submission monitoring list
   GET   /admin/submissions/{id}           read-only detail with answers
   PATCH /admin/citizens/{citizen_id}/verification   PENDING/VERIFIED
-
-Source/ingestion groups (Phase C) are added in a later slice of this
-workstream.
+  GET/POST/PATCH /admin/sources[...]      source registry CRUD
+  POST  /admin/sources/{id}/fetch         manual ingestion (raw snapshot)
+  GET   /admin/ingestion-runs[/{id}]      run monitoring + snapshot viewer
 """
 
 from __future__ import annotations
@@ -36,8 +36,16 @@ from app.models.assessment import EligibilityAssessment
 from app.models.form import FormDefinition, FormQuestion
 from app.models.scheme import SchemeEligibilityRule, SchemeMaster
 from app.models.submission import FormAnswer, FormSubmission
+from app.models.scheme_source import (
+    SCHEME_SOURCE_TYPES,
+    SchemeIngestionRun,
+    SchemeSource,
+    SchemeSourceContent,
+    SchemeSourceDocument,
+)
 from app.repositories.auth_repository import KNOWN_ROLES
 from app.services.auth_service import AuthService
+from app.services.ingestion_service import IngestionError, run_manual_fetch
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -458,3 +466,341 @@ async def admin_update_verification(
         "citizen_id": citizen_id,
         "verification_status": status,
     }
+
+
+# ------------------------------------------------------------------
+# Sources (Phase C: registry)
+# ------------------------------------------------------------------
+
+
+class SourceCreate(BaseModel):
+    source_name: str
+    source_type: str
+    base_url: str
+    authority_name: str | None = None
+    status: str = "ACTIVE"
+
+
+class SourceUpdate(BaseModel):
+    source_name: str | None = None
+    source_type: str | None = None
+    base_url: str | None = None
+    authority_name: str | None = None
+    status: str | None = None
+
+
+class SourceOut(BaseModel):
+    source_id: uuid.UUID
+    source_name: str
+    source_type: str
+    base_url: str | None = None
+    authority_name: str | None = None
+    status: str
+    created_at: Any
+    document_count: int = 0
+    last_run_status: str | None = None
+    last_run_at: Any | None = None
+
+
+def _require_source_type(value: str) -> str:
+    if value not in SCHEME_SOURCE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"source_type must be one of: {', '.join(SCHEME_SOURCE_TYPES)}",
+        )
+    return value
+
+
+@router.get("/sources", response_model=list[SourceOut])
+async def admin_list_sources(db: AsyncSession = Depends(get_db)) -> Any:
+    """Source registry with document counts and the latest run outcome."""
+    result = await db.execute(
+        select(SchemeSource).order_by(SchemeSource.created_at.desc())
+    )
+    sources = result.scalars().all()
+
+    doc_counts = await db.execute(
+        select(
+            SchemeSourceDocument.source_id,
+            func.count(SchemeSourceDocument.source_document_id),
+        )
+        .group_by(SchemeSourceDocument.source_id)
+    )
+    doc_count_map = dict(doc_counts.all())
+
+    last_runs = await db.execute(
+        select(
+            SchemeIngestionRun.source_id,
+            func.max(SchemeIngestionRun.started_at),
+        ).group_by(SchemeIngestionRun.source_id)
+    )
+    last_run_times = dict(last_runs.all())
+
+    last_status_rows = await db.execute(select(SchemeIngestionRun))
+    last_status_map: dict[uuid.UUID, SchemeIngestionRun] = {}
+    for run in last_status_rows.scalars():
+        previous = last_status_map.get(run.source_id)
+        if previous is None or (run.started_at or run.created_at) >= (
+            previous.started_at or previous.created_at
+        ):
+            last_status_map[run.source_id] = run
+
+    return [
+        SourceOut(
+            source_id=source.source_id,
+            source_name=source.source_name,
+            source_type=source.source_type,
+            base_url=source.base_url,
+            authority_name=source.authority_name,
+            status=source.status,
+            created_at=source.created_at,
+            document_count=doc_count_map.get(source.source_id, 0),
+            last_run_status=(
+                last_status_map[source.source_id].status
+                if source.source_id in last_status_map
+                else None
+            ),
+            last_run_at=last_run_times.get(source.source_id),
+        )
+        for source in sources
+    ]
+
+
+@router.post("/sources", response_model=SourceOut)
+async def admin_create_source(
+    body: SourceCreate,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Register a new scheme source."""
+    _require_source_type(body.source_type)
+    if not body.base_url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="base_url must be an absolute http(s) URL")
+    if body.status not in ("ACTIVE", "INACTIVE", "RETIRED"):
+        raise HTTPException(status_code=400, detail="status must be ACTIVE, INACTIVE, or RETIRED")
+
+    source = SchemeSource(
+        source_name=body.source_name,
+        source_type=body.source_type,
+        base_url=body.base_url,
+        authority_name=body.authority_name,
+        status=body.status,
+    )
+    db.add(source)
+    await db.flush()
+    return SourceOut(
+        source_id=source.source_id,
+        source_name=source.source_name,
+        source_type=source.source_type,
+        base_url=source.base_url,
+        authority_name=source.authority_name,
+        status=source.status,
+        created_at=source.created_at,
+        document_count=0,
+    )
+
+
+@router.patch("/sources/{source_id}", response_model=SourceOut)
+async def admin_update_source(
+    source_id: uuid.UUID,
+    body: SourceUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Update a registered source (name, URL, type, authority, status)."""
+    source = await db.get(SchemeSource, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    if body.source_type is not None:
+        source.source_type = _require_source_type(body.source_type)
+    if body.status is not None and body.status not in ("ACTIVE", "INACTIVE", "RETIRED"):
+        raise HTTPException(status_code=400, detail="status must be ACTIVE, INACTIVE, or RETIRED")
+
+    for field in ("source_name", "base_url", "authority_name", "status"):
+        value = getattr(body, field)
+        if value is not None:
+            setattr(source, field, value)
+
+    await db.flush()
+    return SourceOut(
+        source_id=source.source_id,
+        source_name=source.source_name,
+        source_type=source.source_type,
+        base_url=source.base_url,
+        authority_name=source.authority_name,
+        status=source.status,
+        created_at=source.created_at,
+    )
+
+
+# ------------------------------------------------------------------
+# Manual ingestion (Phase C2)
+# ------------------------------------------------------------------
+
+
+@router.post("/sources/{source_id}/fetch")
+async def admin_fetch_source(
+    source_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Trigger one manual ingestion run: fetch, snapshot raw content + hash.
+
+    Never modifies scheme or rule data — the run stops at the raw snapshot
+    layer by design.
+    """
+    source = await db.get(SchemeSource, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if source.status != "ACTIVE":
+        raise HTTPException(status_code=400, detail="Source is not ACTIVE")
+    if not source.base_url:
+        raise HTTPException(status_code=400, detail="Source has no base_url to fetch")
+
+    try:
+        run = await run_manual_fetch(db, source)
+    except IngestionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "ingestion_run_id": run.ingestion_run_id,
+        "source_id": source.source_id,
+        "status": run.status,
+        "error_summary": run.error_summary,
+        "records_created": run.records_created,
+        "completed_at": run.completed_at,
+    }
+
+
+# ------------------------------------------------------------------
+# Ingestion run monitoring (Phase C3)
+# ------------------------------------------------------------------
+
+
+class RunOut(BaseModel):
+    ingestion_run_id: uuid.UUID
+    source_id: uuid.UUID
+    source_name: str | None = None
+    status: str
+    started_at: Any
+    completed_at: Any | None = None
+    records_discovered: int = 0
+    records_created: int = 0
+    records_failed: int = 0
+    error_summary: str | None = None
+
+
+class ContentOut(BaseModel):
+    content_id: uuid.UUID
+    content_type: str
+    language: str | None = None
+    processing_status: str
+    retrieved_at: Any | None = None
+    raw_content: str | None = None
+
+
+class RunDetailOut(RunOut):
+    documents: list[dict[str, Any]] = []
+    contents: list[ContentOut] = []
+
+
+@router.get("/ingestion-runs", response_model=list[RunOut])
+async def admin_list_runs(
+    source_id: uuid.UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Ingestion run history, newest first."""
+    query = (
+        select(SchemeIngestionRun, SchemeSource.source_name)
+        .join(SchemeSource, SchemeSource.source_id == SchemeIngestionRun.source_id)
+        .order_by(SchemeIngestionRun.started_at.desc())
+        .limit(100)
+    )
+    if source_id:
+        query = query.where(SchemeIngestionRun.source_id == source_id)
+
+    result = await db.execute(query)
+    return [
+        RunOut(
+            ingestion_run_id=run.ingestion_run_id,
+            source_id=run.source_id,
+            source_name=source_name,
+            status=run.status,
+            started_at=run.started_at,
+            completed_at=run.completed_at,
+            records_discovered=run.records_discovered,
+            records_created=run.records_created,
+            records_failed=run.records_failed,
+            error_summary=run.error_summary,
+        )
+        for run, source_name in result.all()
+    ]
+
+
+@router.get("/ingestion-runs/{run_id}", response_model=RunDetailOut)
+async def admin_run_detail(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Full run detail: documents, hashes, and the raw snapshot itself."""
+    row = await db.execute(
+        select(SchemeIngestionRun, SchemeSource.source_name)
+        .join(SchemeSource, SchemeSource.source_id == SchemeIngestionRun.source_id)
+        .where(SchemeIngestionRun.ingestion_run_id == run_id)
+    )
+    run_row = row.first()
+    if run_row is None:
+        raise HTTPException(status_code=404, detail="Ingestion run not found")
+    run, source_name = run_row
+
+    doc_result = await db.execute(
+        select(SchemeSourceDocument).where(
+            SchemeSourceDocument.source_id == run.source_id
+        )
+    )
+    documents = [
+        {
+            "source_document_id": doc.source_document_id,
+            "document_name": doc.document_name,
+            "document_url": doc.document_url,
+            "version": doc.version,
+            "content_hash": doc.content_hash,
+            "retrieved_at": doc.retrieved_at,
+            "processing_status": doc.processing_status,
+        }
+        for doc in doc_result.scalars().all()
+    ]
+
+    content_result = await db.execute(
+        select(SchemeSourceContent)
+        .join(
+            SchemeSourceDocument,
+            SchemeSourceDocument.source_document_id == SchemeSourceContent.source_document_id,
+        )
+        .where(SchemeSourceDocument.source_id == run.source_id)
+        .order_by(SchemeSourceContent.retrieved_at.desc())
+    )
+    contents = [
+        ContentOut(
+            content_id=content.content_id,
+            content_type=content.content_type,
+            language=content.language,
+            processing_status=content.processing_status,
+            retrieved_at=content.retrieved_at,
+            raw_content=content.raw_content,
+        )
+        for content in content_result.scalars().all()
+    ]
+
+    return RunDetailOut(
+        ingestion_run_id=run.ingestion_run_id,
+        source_id=run.source_id,
+        source_name=source_name,
+        status=run.status,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        records_discovered=run.records_discovered,
+        records_created=run.records_created,
+        records_failed=run.records_failed,
+        error_summary=run.error_summary,
+        documents=documents,
+        contents=contents,
+    )

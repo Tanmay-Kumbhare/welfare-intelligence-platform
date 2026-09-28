@@ -23,3 +23,10 @@ python-dotenv==1.0.1
 pytest==8.3.4
 pytest-asyncio==0.24.0
 httpx==0.28.1
+
+# Auth: passlib for bcrypt hashing. bcrypt MUST stay on 4.x — passlib 1.7.4
+# is incompatible with bcrypt 5.x (ValueError on its internal 72-byte
+# self-test), which made every register/login hash call crash with a 500.
+passlib[bcrypt]==1.7.4
+bcrypt>=4.0,<4.1
+email-validator==2.2.0 

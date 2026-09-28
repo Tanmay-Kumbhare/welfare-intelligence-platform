@@ -50,6 +50,56 @@ class CitizenRepository:
         await self.db.refresh(citizen)
         return citizen
 
+    async def create_for_user(
+        self, user_id: uuid.UUID, data: dict
+    ) -> CitizenMaster:
+        """Create an owned citizen profile for an authenticated user."""
+        from app.schemas.citizen import CitizenCreate
+
+        payload = CitizenCreate.model_validate(data)
+        citizen = CitizenMaster(
+            full_name=payload.full_name,
+            date_of_birth=payload.date_of_birth,
+            gender=payload.gender,
+            mobile_number=payload.mobile_number,
+            email_id=payload.email_id,
+            citizen_type=payload.citizen_type,
+            owning_user_id=user_id,
+        )
+        self.db.add(citizen)
+        await self.db.flush()
+
+        demographic = DemographicProfile(
+            citizen_id=citizen.citizen_id,
+            **payload.demographic.model_dump(),
+        )
+        financial = FinancialProfile(
+            citizen_id=citizen.citizen_id,
+            **payload.financial.model_dump(),
+        )
+        location = LocationProfile(
+            citizen_id=citizen.citizen_id,
+            **payload.location.model_dump(),
+        )
+        self.db.add_all([demographic, financial, location])
+        await self.db.flush()
+        await self.db.refresh(citizen)
+        return citizen
+
+    async def get_by_owning_user(self, user_id: uuid.UUID) -> CitizenMaster | None:
+        """Fetch the citizen profile owned by an authenticated user."""
+        result = await self.db.execute(
+            select(CitizenMaster)
+            .where(CitizenMaster.owning_user_id == user_id)
+            .options(
+                selectinload(CitizenMaster.demographic_profile),
+                selectinload(CitizenMaster.financial_profile),
+                selectinload(CitizenMaster.location_profile),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_id(self, citizen_id: uuid.UUID) -> Optional[CitizenMaster]:
         """Fetch a citizen with all sub-profiles eagerly loaded."""
         result = await self.db.execute(
@@ -91,6 +141,32 @@ class CitizenRepository:
             # Registration always creates all three rows. Keeping this guard
             # makes edits resilient to a legacy incomplete record without
             # creating a second citizen identity.
+            if profile is not None:
+                for field, value in values.items():
+                    setattr(profile, field, value)
+        await self.db.flush()
+        return citizen
+
+    async def update_for_user(
+        self, user_id: uuid.UUID, data: dict
+    ) -> Optional[CitizenMaster]:
+        """Update the citizen profile owned by an authenticated user."""
+        from app.schemas.citizen import CitizenUpdate
+
+        citizen = await self.get_by_owning_user(user_id)
+        if citizen is None:
+            return None
+        payload = CitizenUpdate.model_validate(data)
+        for field in (
+            "full_name", "date_of_birth", "gender", "mobile_number",
+            "email_id", "citizen_type",
+        ):
+            setattr(citizen, field, getattr(payload, field))
+        for profile, values in (
+            (citizen.demographic_profile, payload.demographic.model_dump()),
+            (citizen.financial_profile, payload.financial.model_dump()),
+            (citizen.location_profile, payload.location.model_dump()),
+        ):
             if profile is not None:
                 for field, value in values.items():
                     setattr(profile, field, value)

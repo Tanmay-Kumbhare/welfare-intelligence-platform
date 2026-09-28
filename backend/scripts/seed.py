@@ -9,6 +9,7 @@ import logging
 import os
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import get_settings
@@ -37,10 +38,21 @@ async def seed_data():
         data = json.load(f)
 
     async with async_session() as session:
+        # Idempotent seeding: skip schemes that already exist by name so a
+        # re-run never duplicates rows (the seeder previously inserted
+        # unconditionally, which duplicated every scheme on a second run).
+        existing_names = set(
+            (await session.execute(select(SchemeMaster.scheme_name))).scalars()
+        )
+        seeded = 0
+        skipped = 0
+
         for s_data in data["schemes"]:
-            # Check if scheme already exists
-            # We don't do complex upserts here for simplicity; just skip if it exists
-            # by name. In a real system, you might wipe and recreate or do upserts.
+            if s_data["scheme_name"] in existing_names:
+                logger.info(f"Skipping existing scheme: {s_data['scheme_name']}")
+                skipped += 1
+                continue
+
             scheme = SchemeMaster(
                 scheme_name=s_data["scheme_name"],
                 department_name=s_data.get("department_name"),
@@ -54,6 +66,7 @@ async def seed_data():
             )
             session.add(scheme)
             await session.flush()
+            seeded += 1
 
             # Add groups and rules
             for g_data in s_data.get("rule_groups", []):
@@ -89,7 +102,7 @@ async def seed_data():
                 session.add(doc)
 
         await session.commit()
-        logger.info("Seed data successfully loaded!")
+        logger.info(f"Seed complete: {seeded} schemes inserted, {skipped} skipped (already exist).")
 
     await engine.dispose()
 

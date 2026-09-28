@@ -38,3 +38,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Agent tooling (local only)
+.freebuff/

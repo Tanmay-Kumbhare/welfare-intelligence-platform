@@ -191,8 +191,30 @@ Structural DB round-trip reduction (tested, not latency-measured):
 
 ## 10. KNOWN BUGS
 
-- None currently known open. (The historical age mismatch and the
-  "belongs to a different user" identity bug are fixed and regression-tested.)
+- None currently known open. (The historical age mismatch, the
+  "belongs to a different user" identity bug, and the second-save
+  `MissingGreenlet` 500 are all fixed and regression-tested.)
+
+### Fixed 2026-09-23 — second-save 500 (form step 2+)
+
+**Symptom:** the citizen profile form 500s on any save that *updates*
+existing answers (i.e. every "Save & Continue" after the first section, which
+is where the employment-status step appears).
+
+**Root cause:** `FormAnswer.updated_at` is server-generated (`onupdate`). The
+commit-13 batched save path no longer re-fetches the submission after the
+flush, so the ORM expires the rows' server defaults; response serialization
+(`_to_response`) then reads `updated_at` synchronously inside the async
+session → `sqlalchemy.exc.MissingGreenlet` → 500.
+
+**Fix:** `FormAnswer.__mapper_args__ = {"eager_defaults": True}
+(backend/app/models/submission.py)` — the flush fetches server-generated
+columns via Postgres `RETURNING`, so nothing expires. Verified by reverting:
+`test_12_update_answer_overwrites_no_duplicates` fails with the same 500
+without the flag and passes with it. Live API E2E across all employment
+branches (student / self-employed / unemployed / employed+farmer /
+retired+PwD / branch switch / required-enforcement / type-validation /
+ownership): 214 checks passed, 0 failed.
 
 ## 11. Phase 3A — architecture findings (IMPLEMENTED as docs)
 

@@ -209,7 +209,10 @@ describe("CheckEligibilityPage — wizard, save, resume", () => {
 
   it("hides conditional questions in response to answers (no value sent when hidden)", async () => {
     await startOnForm();
-    await userEvent.click(screen.getByRole("button", { name: /save & continue/i }));
+    // The heading can appear before the draft resolves and the form card
+    // mounts — wait for the nav button rather than clicking immediately.
+    const saveButton = await screen.findByRole("button", { name: /save & continue/i });
+    await userEvent.click(saveButton);
     await screen.findByText(/section 2 of 3/i);
     await userEvent.selectOptions(screen.getByLabelText(/currently studying/i), "NO");
     expect(screen.queryByLabelText(/which course/i)).not.toBeInTheDocument();

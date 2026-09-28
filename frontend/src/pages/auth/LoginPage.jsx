@@ -22,10 +22,18 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const response = await authService.login({ email, password });
-      const { token, user_id, email: loggedInEmail } = response.data;
+      const { token, user_id, email: loggedInEmail, roles } = response.data;
       saveToken(token);
-      saveUser({ user_id, email: loggedInEmail });
-      navigate("/");
+      saveUser({ user_id, email: loggedInEmail, roles: roles || [] });
+      // Admins land on their dashboard; citizens go home (or back to the
+      // page that bounced them to login).
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get("from");
+      if (!from && roles?.includes("ADMIN")) {
+        navigate("/admin");
+      } else {
+        navigate(from || "/");
+      }
       return;
     } catch (requestError) {
       setError(

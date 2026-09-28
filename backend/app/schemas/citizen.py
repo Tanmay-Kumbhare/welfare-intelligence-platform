@@ -124,3 +124,18 @@ class CitizenResponse(BaseModel):
     demographic: Optional[DemographicProfileResponse] = None
     financial: Optional[FinancialProfileResponse] = None
     location: Optional[LocationProfileResponse] = None
+
+
+class FactSyncSummary(BaseModel):
+    """Outcome of re-deriving profile facts after a direct profile edit.
+    facts_updated: fact codes whose open value changed or was created.
+    skipped_verified: codes left untouched because an admin/government
+    verified fact exists and a self-reported edit cannot override it."""
+    facts_updated: list[str] = []
+    skipped_verified: list[str] = []
+
+
+class CitizenUpdateResponse(CitizenResponse):
+    """PUT /citizens/{id} response: the saved profile plus the fact-sync
+    summary so the frontend can confirm eligibility data is current."""
+    fact_sync: Optional[FactSyncSummary] = None

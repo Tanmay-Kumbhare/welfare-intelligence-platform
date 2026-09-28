@@ -19,6 +19,7 @@ import AdminOverviewPage from "./pages/admin/AdminOverviewPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminSchemesPage from "./pages/admin/AdminSchemesPage";
 import AdminSubmissionsPage from "./pages/admin/AdminSubmissionsPage";
+import AdminSourcesPage from "./pages/admin/AdminSourcesPage";
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="schemes" element={<AdminSchemesPage />} />
             <Route path="submissions" element={<AdminSubmissionsPage />} />
+            <Route path="sources" element={<AdminSourcesPage />} />
           </Route>
 
           <Route path="/check-eligibility" element={<CheckEligibilityPage />} />

@@ -38,6 +38,7 @@ export default function CheckEligibilityPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [message, setMessage] = useState("");
   const [saveState, setSaveState] = useState("idle"); // idle|saving|saved
+  const [prefilled, setPrefilled] = useState(false);
   const [fieldErrors, setFieldErrors] = useState(() => new Map());
   const answersRef = useRef(answers);
   answersRef.current = answers;
@@ -123,10 +124,36 @@ export default function CheckEligibilityPage() {
     if (phase !== "form" || !identity || !form || submission) return;
     let cancelled = false;
     ensureSubmission()
-      .then((draft) => {
+      .then(async (draft) => {
         if (cancelled || !draft) return;
-        setAnswers(storedAnswersByQuestionId(draft));
-        if (draft.completion_percentage > 0) setSaveState("saved");
+        const stored = storedAnswersByQuestionId(draft);
+        // Returning users should not re-type what the platform already
+        // knows. Prefill any unanswered question from the citizen's own
+        // profile (backend resolves the citizen from the auth token).
+        if (Object.keys(stored).length < form.sections.reduce((n, s) => n + s.questions.length, 0)) {
+          try {
+            const prefillResponse = await formService.getPrefill(FORM_CODE);
+            const prefill = prefillResponse.data?.values || {};
+            const byCode = new Map();
+            for (const section of form.sections) {
+              for (const question of section.questions) {
+                byCode.set(question.question_code, question);
+              }
+            }
+            for (const [code, value] of Object.entries(prefill)) {
+              const question = byCode.get(code);
+              if (question && !stored.has(question.question_id) && value !== null && value !== undefined) {
+                stored.set(question.question_id, value);
+                setPrefilled(true);
+              }
+            }
+          } catch {
+            // Prefill is an enhancement — the form is fully usable without it.
+          }
+        }
+        if (cancelled) return;
+        setAnswers(stored);
+        if (draft.completion_percentage > 0 || stored.size > 0) setSaveState("saved");
       })
       .catch(() => {
         if (!cancelled) setPhase("form-error");
@@ -405,6 +432,8 @@ export default function CheckEligibilityPage() {
             Answering as <span className="text-ink font-medium">{identity.fullName}</span>
             {identity.dateOfBirth ? ` · DOB ${identity.dateOfBirth}` : ""} — this was set when you created your
             profile and is not asked again here.
+            {prefilled &&
+              " Answers already known from your profile are prefilled below — review and update anything that changed."}
           </p>
         )}
         {form && submission && (

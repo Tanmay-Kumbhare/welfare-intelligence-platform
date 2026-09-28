@@ -61,6 +61,8 @@ export const recommendationService = {
 // the backend — no question data is duplicated in the frontend.
 export const formService = {
   getActive: (formCode) => api.get(`/forms/${formCode}`),
+  // Profile-derived values for prefilling the form (authenticated users).
+  getPrefill: (formCode) => api.get(`/forms/${formCode}/prefill`),
 };
 
 export const formSubmissionService = {

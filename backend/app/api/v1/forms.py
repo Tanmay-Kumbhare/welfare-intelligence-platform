@@ -15,6 +15,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.deps import get_authenticated_user
 from app.database import get_db
 from app.repositories.form_repository import FormRepository
 from app.schemas.form import (
@@ -30,10 +31,12 @@ from app.schemas.form import (
 from app.schemas.normalization import NormalizeRequest, NormalizationSummary
 from app.services.form_logic import FormServiceError, SubmissionNotFoundError, SubmissionOwnershipError
 from app.services.form_service import FormService
+from app.services.auth_service import AuthService
 from app.services.normalization_service import (
     NormalizationService,
     SubmissionNotCompletedError,
 )
+from app.services.profile_sync_service import ProfileSyncService
 from app.services.submission_service import SubmissionService
 
 router = APIRouter()
@@ -117,6 +120,44 @@ async def get_form(
         return await service.get_active_form(form_code)
     except FormServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail())
+
+
+@router.get(
+    "/{form_code}/prefill",
+    summary="Profile-derived prefill values for the active form",
+    responses={
+        401: {"description": "Not signed in"},
+        404: {"description": "Form or citizen profile not found"},
+    },
+)
+async def get_form_prefill(
+    form_code: str,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_authenticated_user),
+) -> Any:
+    """Values the citizen's profile already holds for this form's questions.
+
+    Returning users should not re-type what the platform knows: every
+    question with a canonical profile mapping is prefilled from the
+    citizen's own profile tables. The citizen_id is resolved from the
+    authenticated user — never from a client-supplied id.
+    """
+    form_service = FormService(FormRepository(db))
+    try:
+        form = await form_service.get_active_form(form_code)
+    except FormServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail())
+
+    auth_service = AuthService(db)
+    citizen = await auth_service.get_citizen_for_user(user)
+    if citizen is None:
+        raise HTTPException(status_code=404, detail="No citizen profile for this account")
+
+    questions = [
+        q for section in form.sections for q in section.questions
+    ]
+    sync = ProfileSyncService(db)
+    return await sync.compute_prefill(citizen.citizen_id, questions)
 
 
 @router.post(

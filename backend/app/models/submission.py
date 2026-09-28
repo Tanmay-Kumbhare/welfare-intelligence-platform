@@ -109,6 +109,12 @@ class FormAnswer(Base):
         # One answer per question per submission; re-answering overwrites.
         UniqueConstraint("submission_id", "question_id", name="uq_submission_question"),
     )
+    # created_at/updated_at are server-generated (onupdate included). Without
+    # eager_defaults the ORM expires them after each flush and any subsequent
+    # access (response serialization) triggers a synchronous lazy-load, which
+    # is illegal in an async session (MissingGreenlet -> 500 on the second
+    # save of a submission). RETURNING keeps the in-memory values current.
+    __mapper_args__ = {"eager_defaults": True}
 
     answer_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

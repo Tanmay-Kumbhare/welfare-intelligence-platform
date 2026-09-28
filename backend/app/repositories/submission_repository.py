@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.form import FormDefinition
+from app.models.form import FormCondition, FormDefinition, FormQuestion, FormSection
 from app.models.submission import FormAnswer, FormSubmission
 
 _EDITABLE_STATUSES = ("DRAFT", "IN_PROGRESS")
@@ -24,10 +24,23 @@ class SubmissionRepository:
 
     @staticmethod
     def _loaded_options():
-        """Eager-load answers (with their questions) and the form."""
+        """Eager-load answers and every form relationship the service reads.
+
+        ``get_by_id`` uses ``populate_existing`` after an answer write.  A
+        shallow form load would expire an already-loaded hierarchy and make a
+        later ``form.sections`` access attempt an async lazy load.
+        """
+        to_questions = (
+            selectinload(FormSubmission.form)
+            .selectinload(FormDefinition.sections)
+            .selectinload(FormSection.questions)
+        )
         return (
             selectinload(FormSubmission.answers).selectinload(FormAnswer.question),
-            selectinload(FormSubmission.form),
+            to_questions.selectinload(FormQuestion.options),
+            to_questions.selectinload(FormQuestion.conditions).selectinload(
+                FormCondition.depends_on_question
+            ),
         )
 
     async def create(self, submission: FormSubmission) -> FormSubmission:

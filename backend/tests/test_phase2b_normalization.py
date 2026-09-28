@@ -610,7 +610,7 @@ class TestIdempotency:
             client, tracked,
             {
                 "Q_STATE": "Rajasthan", "Q_PINCODE": "302001",
-                "Q_INCOME": "200000", "Q_FAMILY_SIZE": 3,
+                "Q_INCOME": "200000", "Q_FAMILY_SIZE": 1,
                 "Q_FAMILY": [{"relationship": "MOTHER", "name": "Kamla"}],
             },
         )

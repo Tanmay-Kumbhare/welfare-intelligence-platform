@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { User, LogOut, HelpCircle } from "lucide-react";
+import { User, LogOut, HelpCircle, ShieldCheck } from "lucide-react";
 import { getUser, clearAuth } from "../../services/auth";
 import { authService } from "../../services/api";
 
@@ -102,6 +102,8 @@ export default function Header() {
     }
   };
 
+  const isAdmin = Boolean(getUser()?.roles?.includes("ADMIN"));
+
   return (
     <header className="bg-paper-raised border-b-[3px] border-accent">
       <div className="max-w-[1040px] mx-auto px-5 sm:px-7 py-4 flex items-center justify-between gap-6 flex-wrap">
@@ -116,6 +118,16 @@ export default function Header() {
                 {link.label}
               </NavLink>
             ))}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className={navClasses}
+                title="Administration"
+              >
+                <ShieldCheck className="h-4 w-4 inline mr-1 -mt-0.5" />
+                Admin
+              </NavLink>
+            )}
             <NavLink
               to="/help"
               className="flex items-center gap-1 font-sans text-sm px-3 py-2 text-ink-soft hover:text-ink"

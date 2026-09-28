@@ -14,6 +14,11 @@ import NotFoundPage from "./pages/NotFoundPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ProfileCompletionGate from "./pages/auth/ProfileCompletionGate";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminOverviewPage from "./pages/admin/AdminOverviewPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminSchemesPage from "./pages/admin/AdminSchemesPage";
+import AdminSubmissionsPage from "./pages/admin/AdminSubmissionsPage";
 
 function App() {
   return (
@@ -35,6 +40,15 @@ function App() {
               <Route path="/results/:citizenId" element={<ResultsPage />} />
               <Route path="/why-excluded/:citizenId/:schemeId" element={<WhyExcludedPage />} />
             </Route>
+          </Route>
+
+          {/* Admin area: own sidebar layout, gated by AdminGate (UX) and
+              require_admin on every backend endpoint (real security). */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminOverviewPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="schemes" element={<AdminSchemesPage />} />
+            <Route path="submissions" element={<AdminSubmissionsPage />} />
           </Route>
 
           <Route path="/check-eligibility" element={<CheckEligibilityPage />} />

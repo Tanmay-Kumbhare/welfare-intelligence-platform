@@ -43,6 +43,9 @@ from app.models.scheme_source import (
     SchemeSourceDocument,
 )
 
+# Auth models (added after the existing domain models)
+from app.models.auth import UserAccount, UserRole, UserSession
+
 __all__ = [
     "CitizenMaster",
     "DemographicProfile",
@@ -86,4 +89,8 @@ __all__ = [
     "SCHEME_SOURCE_TYPES",
     "CONTENT_TYPES",
     "PROCESSING_STATUSES",
+    # Auth
+    "UserAccount",
+    "UserRole",
+    "UserSession",
 ]

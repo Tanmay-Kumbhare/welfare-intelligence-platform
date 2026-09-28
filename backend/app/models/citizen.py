@@ -37,8 +37,15 @@ class CitizenMaster(Base):
     registration_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
     # PENDING | VERIFIED
     verification_status: Mapped[str] = mapped_column(String(20), default="PENDING")
+    # Link to the authenticated user who owns this citizen profile.
+    owning_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_user_account.user_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
-    # Relationships
+    # Relationships
     demographic_profile: Mapped["DemographicProfile | None"] = relationship(
         back_populates="citizen", uselist=False, cascade="all, delete-orphan"
     )

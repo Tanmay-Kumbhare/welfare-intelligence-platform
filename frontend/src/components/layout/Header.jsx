@@ -91,6 +91,27 @@ function UserMenu({ user, onLogout }) {
 export default function Header() {
   const user = getUser();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const loginRef = useRef(null);
+
+  // Close the login dropdown on outside click or Escape.
+  useEffect(() => {
+    if (!loginOpen) return;
+    const onPointerDown = (event) => {
+      if (loginRef.current && !loginRef.current.contains(event.target)) {
+        setLoginOpen(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setLoginOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [loginOpen]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -138,6 +159,58 @@ export default function Header() {
           </nav>
 
           {user && <UserMenu user={user} onLogout={handleLogout} />}
+
+          {!user && (
+            <div className="flex items-center gap-2">
+              <div className="relative" ref={loginRef}>
+                <button
+                  type="button"
+                  className="font-sans text-sm px-4 py-2 rounded-sm bg-accent text-white hover:bg-accent-ink transition-colors font-medium"
+                  aria-expanded={loginOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setLoginOpen((v) => !v)}
+                >
+                  Login ▾
+                </button>
+                {loginOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-56 bg-paper-raised border border-line rounded-sm shadow-md z-20"
+                  >
+                    <NavLink
+                      to="/login"
+                      role="menuitem"
+                      className="block px-4 py-3 text-sm text-ink hover:bg-accent-tint"
+                      onClick={() => setLoginOpen(false)}
+                    >
+                      Citizen Login
+                      <span className="block text-xs text-ink-soft mt-0.5">
+                        Check schemes &amp; manage your profile
+                      </span>
+                    </NavLink>
+                    <NavLink
+                      to="/login?mode=admin"
+                      role="menuitem"
+                      className="block px-4 py-3 text-sm text-ink hover:bg-accent-tint border-t border-line"
+                      onClick={() => setLoginOpen(false)}
+                    >
+                      <ShieldCheck className="h-4 w-4 inline mr-1.5 -mt-0.5" />
+                      Admin Login
+                      <span className="block text-xs text-ink-soft mt-0.5">
+                        Platform administration dashboard
+                      </span>
+                    </NavLink>
+                  </div>
+                )}
+              </div>
+              <NavLink
+                to="/register"
+                className="font-sans text-sm px-4 py-2 rounded-sm border border-accent text-accent-ink hover:bg-accent-tint transition-colors font-medium"
+              >
+                Register
+              </NavLink>
+            </div>
+          )}
         </div>
       </div>
     </header>

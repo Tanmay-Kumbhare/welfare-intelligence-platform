@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -30,7 +30,13 @@ function answersPayload(answersMap) {
 
 export default function CheckEligibilityPage() {
   const navigate = useNavigate();
-  const [phase, setPhase] = useState("loading"); // loading|no-citizen|form|form-error|review|submitting|normalizing|evaluating
+  // ?edit=1 (from Profile "Review & edit answers") forces the prefilled form
+  // directly, skipping the "results ready" interstitial.
+  const [searchParams] = useSearchParams();
+  const editMode = searchParams.get("edit") === "1";
+  // loading|no-citizen|form|form-error|review|submitting|normalizing|evaluating
+  // |completed: form already submitted once — offer results / review / re-evaluate
+  const [phase, setPhase] = useState("loading");
   const [identity, setIdentity] = useState(null);
   const [form, setForm] = useState(null);
   const [submission, setSubmission] = useState(null);
@@ -106,6 +112,10 @@ export default function CheckEligibilityPage() {
     // POST /submissions resumes the citizen's latest editable draft server-
     // side. The in-flight guard stops React StrictMode's double effect fire
     // in dev from racing two creates (harmless server-side, but wasteful).
+    // NOTE: deliberately does NOT setSubmission here — a state update mid-
+    // chain would re-trigger this effect (submission is a dep) and cancel
+    // the in-flight prefill work via the cleanup's `cancelled` flag. The
+    // caller sets all state together once the chain completes.
     if (submissionInFlight.current) return null;
     submissionInFlight.current = true;
     try {
@@ -113,7 +123,6 @@ export default function CheckEligibilityPage() {
         citizen_id: identity.citizenId,
         answers: [],
       });
-      setSubmission(response.data);
       return response.data;
     } finally {
       submissionInFlight.current = false;
@@ -127,33 +136,60 @@ export default function CheckEligibilityPage() {
       .then(async (draft) => {
         if (cancelled || !draft) return;
         const stored = storedAnswersByQuestionId(draft);
-        // Returning users should not re-type what the platform already
-        // knows. Prefill any unanswered question from the citizen's own
-        // profile (backend resolves the citizen from the auth token).
+        const byCode = new Map();
+        for (const section of form.sections) {
+          for (const question of section.questions) {
+            byCode.set(question.question_code, question);
+          }
+        }
+        let savedCount = 0;
+        // 1) Everything the citizen already answered in a previous visit
+        // (latest COMPLETED submission, or their draft). Answered questions
+        // are never asked again — they reappear prefilled and editable.
+        let hasCompleted = false;
+        try {
+          const savedResponse = await formService.getSavedAnswers(FORM_CODE);
+          const saved = savedResponse.data?.values || {};
+          hasCompleted = Boolean(savedResponse.data?.has_completed);
+          for (const [code, value] of Object.entries(saved)) {
+            const question = byCode.get(code);
+            if (question && !stored.has(question.question_id) && value !== null && value !== undefined) {
+              stored.set(question.question_id, value);
+              savedCount += 1;
+            }
+          }
+        } catch {
+          // Saved answers are an enhancement — the form still works without them.
+        }
+        // 2) Profile-derived prefill for anything still unanswered.
         if (Object.keys(stored).length < form.sections.reduce((n, s) => n + s.questions.length, 0)) {
           try {
             const prefillResponse = await formService.getPrefill(FORM_CODE);
             const prefill = prefillResponse.data?.values || {};
-            const byCode = new Map();
-            for (const section of form.sections) {
-              for (const question of section.questions) {
-                byCode.set(question.question_code, question);
-              }
-            }
             for (const [code, value] of Object.entries(prefill)) {
               const question = byCode.get(code);
               if (question && !stored.has(question.question_id) && value !== null && value !== undefined) {
                 stored.set(question.question_id, value);
-                setPrefilled(true);
+                savedCount += 1;
               }
             }
           } catch {
             // Prefill is an enhancement — the form is fully usable without it.
           }
         }
+        // Commit ALL state in one go, at the end of the chain — no state
+        // update happened mid-chain, so this work was never self-cancelled.
         if (cancelled) return;
+        if (savedCount > 0) setPrefilled(true);
+        setSubmission(draft);
         setAnswers(stored);
         if (draft.completion_percentage > 0 || stored.size > 0) setSaveState("saved");
+        // Returning user who already completed the form: offer results, with
+        // the fully prefilled form one click away. ?edit=1 (Profile →
+        // "Review & edit answers") skips the interstitial entirely.
+        if (hasCompleted && !editMode) {
+          setPhase("completed");
+        }
       })
       .catch(() => {
         if (!cancelled) setPhase("form-error");
@@ -223,6 +259,10 @@ export default function CheckEligibilityPage() {
     const saved = await saveProgress();
     if (saved) goToStep(currentStep + 1);
   };
+
+  // Skip to the next section WITHOUT saving — for returning users walking
+  // through already-prefilled sections they don't intend to change.
+  const nextWithoutSaving = () => goToStep(currentStep + 1);
 
   const submitAll = async () => {
     setPhase("submitting");
@@ -314,6 +354,44 @@ export default function CheckEligibilityPage() {
       }))
       .filter((entry) => entry.items.length > 0);
   }, [form, answers, applicable]);
+
+  // ---------------- completed screen (returning user) ----------------
+  // Deliberately placed AFTER every hook: an early return above a hook would
+  // crash React with "rendered fewer hooks than expected".
+  if (phase === "completed") {
+    return (
+      <div className="max-w-[720px]">
+        <div className="mb-7">
+          <h1 className="text-[30px] mb-3">Your eligibility is ready</h1>
+          <p className="max-w-[66ch] mb-5">
+            You have already completed your profile, {identity?.fullName?.split(" ")[0] || ""}. Your
+            results are up to date — view them now, or update any answer and
+            we will re-evaluate you.
+          </p>
+        </div>
+        <Card>
+          <div className="flex flex-col gap-3">
+            <Button onClick={() => navigate(`/results/${identity.citizenId}`)}>
+              View my results
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setPhase("form");
+                setPrefilled(true);
+              }}
+            >
+              Update my answers
+            </Button>
+            <p className="text-xs text-ink-soft mt-2 mb-0">
+              “Update my answers” opens your form fully prefilled — change only
+              what changed, save, and your results re-evaluate automatically.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   // ---------------- renders ----------------
   if (phase === "loading") return <LoadingState label="Loading your profile..." />;
@@ -433,7 +511,7 @@ export default function CheckEligibilityPage() {
             {identity.dateOfBirth ? ` · DOB ${identity.dateOfBirth}` : ""} — this was set when you created your
             profile and is not asked again here.
             {prefilled &&
-              " Answers already known from your profile are prefilled below — review and update anything that changed."}
+              " Everything you answered before is prefilled below — only new questions need answering, and you can update any prefilled answer."}
           </p>
         )}
         {form && submission && (
@@ -481,9 +559,14 @@ export default function CheckEligibilityPage() {
                 Save draft
               </Button>
               {currentStep < sectionsCount - 1 ? (
-                <Button onClick={saveAndContinue}>
-                  Save &amp; continue <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </Button>
+                <>
+                  <Button type="button" variant="secondary" onClick={nextWithoutSaving}>
+                    Next
+                  </Button>
+                  <Button onClick={saveAndContinue}>
+                    Save &amp; continue <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </>
               ) : (
                 <Button onClick={() => setPhase("review")}>Review &amp; submit</Button>
               )}

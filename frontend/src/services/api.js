@@ -63,6 +63,8 @@ export const formService = {
   getActive: (formCode) => api.get(`/forms/${formCode}`),
   // Profile-derived values for prefilling the form (authenticated users).
   getPrefill: (formCode) => api.get(`/forms/${formCode}/prefill`),
+  // Everything the citizen already answered (their own latest submission).
+  getSavedAnswers: (formCode) => api.get(`/forms/${formCode}/saved-answers`),
 };
 
 export const formSubmissionService = {

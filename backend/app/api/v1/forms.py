@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_authenticated_user, get_optional_user, require_same_citizen
+from app.cache import invalidate_citizen
 from app.database import get_db
 from app.repositories.form_repository import FormRepository
 from app.schemas.form import (
@@ -123,6 +124,42 @@ async def get_form(
         return await service.get_active_form(form_code)
     except FormServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail())
+
+
+@router.get(
+    "/{form_code}/saved-answers",
+    summary="The signed-in citizen's own saved answers for this form",
+    responses={
+        401: {"description": "Not signed in"},
+        404: {"description": "Form not found or no citizen profile for the account"},
+    },
+)
+async def get_form_saved_answers(
+    form_code: str,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_authenticated_user),
+) -> Any:
+    """Everything the citizen already answered, keyed by question_code.
+
+    Reads the citizen's latest COMPLETED submission (or their editable
+    draft). The check-eligibility flow merges this into the form so an
+    answered question is never asked twice; My Profile uses it to display
+    the full submitted record. The citizen_id always resolves from the
+    auth token — one citizen can only ever read their own answers.
+    """
+    form_service = FormService(FormRepository(db))
+    try:
+        await form_service.get_active_form(form_code)
+    except FormServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail())
+
+    auth_service = AuthService(db)
+    citizen = await auth_service.get_citizen_for_user(user)
+    if citizen is None:
+        raise HTTPException(status_code=404, detail="No citizen profile for this account")
+
+    service = SubmissionService(db)
+    return await service.get_saved_answers(form_code, citizen.citizen_id)
 
 
 @router.get(
@@ -241,11 +278,16 @@ async def normalize_submission(
     await require_same_citizen(user, data.citizen_id, db)
     service = NormalizationService(db)
     try:
-        return await service.normalize_submission(submission_id, data.citizen_id)
+        summary = await service.normalize_submission(submission_id, data.citizen_id)
     except FormServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail())
     except SubmissionNotCompletedError as exc:
         raise HTTPException(status_code=exc.status_code, detail={"message": exc.message})
+    # Normalization wrote canonical profile columns — the short-TTL citizen
+    # read cache must not serve the pre-normalization profile afterwards.
+    # (Hook lives here because normalization_service is intentionally frozen.)
+    invalidate_citizen(data.citizen_id)
+    return summary
 
 
 @router.post(

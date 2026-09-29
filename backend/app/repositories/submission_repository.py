@@ -77,6 +77,45 @@ class SubmissionRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_latest_completed_for_citizen_form(
+        self, citizen_id: uuid.UUID, form_id: uuid.UUID
+    ) -> Optional[FormSubmission]:
+        """Most recent COMPLETED submission — the authoritative record of the
+        answers the citizen already gave, used to prefill re-visits so
+        answered questions are never asked twice."""
+        result = await self.db.execute(
+            select(FormSubmission)
+            .where(
+                FormSubmission.citizen_id == citizen_id,
+                FormSubmission.form_id == form_id,
+                FormSubmission.status == "COMPLETED",
+            )
+            .order_by(FormSubmission.completed_at.desc())
+            .limit(1)
+            .options(*self._loaded_options())
+        )
+        return result.scalar_one_or_none()
+
+    async def list_for_citizen_form_code(
+        self, citizen_id: uuid.UUID, form_code: str
+    ) -> Sequence[FormSubmission]:
+        """All of a citizen's submissions for a form_code across every form
+        version, with answers eager-loaded. Lets the saved-answers lookup
+        heal history: an older version's answers still prefill the current
+        version (matched by stable question_code)."""
+        result = await self.db.execute(
+            select(FormSubmission)
+            .join(FormDefinition, FormDefinition.form_id == FormSubmission.form_id)
+            .where(
+                FormSubmission.citizen_id == citizen_id,
+                FormDefinition.form_code == form_code,
+            )
+            .options(*self._loaded_options())
+            .order_by(FormSubmission.started_at.desc())
+            .limit(20)
+        )
+        return result.scalars().unique().all()
+
     async def get_answer(
         self, submission_id: uuid.UUID, question_id: uuid.UUID
     ) -> Optional[FormAnswer]:

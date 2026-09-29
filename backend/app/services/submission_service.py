@@ -397,6 +397,73 @@ class SubmissionService:
         )
         return self._to_response(fresh, form, stats)
 
+    async def get_saved_answers(
+        self, form_code: str, citizen_id: uuid.UUID
+    ) -> dict[str, Any]:
+        """The citizen's own saved answers for a form, keyed by question_code.
+
+        Source of truth: the citizen's most informative submission for this
+        form_code across ALL versions — completed submissions beat drafts,
+        otherwise the one carrying the most answers. This heals history:
+        answers given under an older form version still prefill the current
+        one (questions match by stable question_code). Answers for questions
+        that no longer exist are dropped, so a refactor never leaks stale
+        questions.
+        """
+        form = await self._resolve_active_form(form_code)
+
+        submissions = await self.repo.list_for_citizen_form_code(
+            citizen_id, form_code
+        )
+        if not submissions:
+            return {
+                "citizen_id": citizen_id,
+                "form_code": form_code,
+                "form_version": form.version,
+                "has_saved": False,
+                "has_completed": False,
+                "values": {},
+            }
+
+        # Pick the most informative submission: any COMPLETED one (newest
+        # first), else the one carrying the most answers.
+        completed = [s for s in submissions if s.status == "COMPLETED"]
+        has_completed = bool(completed)
+        if completed:
+            best = max(
+                completed,
+                key=lambda s: (
+                    s.completed_at or s.started_at,
+                    len(s.answers),
+                ),
+            )
+        else:
+            best = max(submissions, key=lambda s: len(s.answers))
+
+        # Only answers whose question still exists in the ACTIVE form version.
+        current_question_codes = {
+            q.question_code
+            for section in form.sections
+            for q in section.questions
+        }
+        values: dict[str, Any] = {}
+        for answer in best.answers:
+            question = answer.question
+            if question is None or question.question_code not in current_question_codes:
+                continue
+            raw = answer_value(answer)
+            if is_answered(raw):
+                values[question.question_code] = raw
+
+        return {
+            "citizen_id": citizen_id,
+            "form_code": form_code,
+            "form_version": best.form_version,
+            "has_saved": True,
+            "has_completed": has_completed,
+            "values": values,
+        }
+
     async def _resolve_active_form(self, form_code: str) -> FormDefinition:
         form = await self.form_repo.get_active_by_code(form_code)
         if form is None:

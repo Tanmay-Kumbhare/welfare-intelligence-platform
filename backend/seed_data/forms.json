@@ -300,6 +300,21 @@
                   "option_code": "ST",
                   "option_label": "ST",
                   "display_order": 4
+                },
+                {
+                  "option_code": "VJNT",
+                  "option_label": "VJNT",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "SBC",
+                  "option_label": "SBC",
+                  "display_order": 6
+                },
+                {
+                  "option_code": "MINORITY",
+                  "option_label": "Minority",
+                  "display_order": 7
                 }
               ]
             },
@@ -1795,6 +1810,21 @@
                   "option_code": "ST",
                   "option_label": "ST",
                   "display_order": 4
+                },
+                {
+                  "option_code": "VJNT",
+                  "option_label": "VJNT",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "SBC",
+                  "option_label": "SBC",
+                  "display_order": 6
+                },
+                {
+                  "option_code": "MINORITY",
+                  "option_label": "Minority",
+                  "display_order": 7
                 }
               ]
             },
@@ -2521,6 +2551,72 @@
                   "action": "SHOW"
                 }
               ]
+            },
+            {
+              "question_code": "TENTH_PERCENTAGE",
+              "question_text": "What was your 10th standard (SSC) percentage?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 12,
+              "profile_field": "tenth_percentage",
+              "help_text": "Used by education scholarships with exact mark requirements.",
+              "validation_rule": {
+                "min": 0,
+                "max": 100
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "TWELFTH_PERCENTAGE",
+              "question_text": "What was your 12th standard (HSC) percentage?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 13,
+              "profile_field": "twelfth_percentage",
+              "help_text": "Required by minority merit-cum-means and central sector scholarships.",
+              "validation_rule": {
+                "min": 0,
+                "max": 100
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "TWELFTH_PERCENTILE",
+              "question_text": "What was your 12th standard percentile?",
+              "question_type": "decimal",
+              "data_type": "DECIMAL",
+              "required": false,
+              "display_order": 14,
+              "profile_field": "twelfth_percentile",
+              "help_text": "PM-USP Central Sector Scholarship requires above the 80th percentile.",
+              "validation_rule": {
+                "min": 0,
+                "max": 100
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "CURRENTLY_STUDYING",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
             }
           ]
         },
@@ -3213,6 +3309,48 @@
               "required": false,
               "display_order": 4,
               "profile_field": "owns_livestock"
+            },
+            {
+              "question_code": "LIVESTOCK_CATTLE_COUNT",
+              "question_text": "How many cattle/buffalo do you own?",
+              "question_type": "number",
+              "data_type": "INTEGER",
+              "required": false,
+              "display_order": 5,
+              "profile_field": "livestock_cattle_count",
+              "validation_rule": {
+                "min": 0,
+                "max": 500
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "OWNS_LIVESTOCK",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
+            },
+            {
+              "question_code": "LIVESTOCK_POULTRY_COUNT",
+              "question_text": "How many poultry birds do you own?",
+              "question_type": "number",
+              "data_type": "INTEGER",
+              "required": false,
+              "display_order": 6,
+              "profile_field": "livestock_poultry_count",
+              "validation_rule": {
+                "min": 0,
+                "max": 5000
+              },
+              "conditions": [
+                {
+                  "depends_on_question_code": "OWNS_LIVESTOCK",
+                  "operator": "EQUALS",
+                  "comparison_value": "YES",
+                  "action": "SHOW"
+                }
+              ]
             }
           ]
         },
@@ -3249,6 +3387,21 @@
                   "option_code": "ST",
                   "option_label": "ST",
                   "display_order": 4
+                },
+                {
+                  "option_code": "VJNT",
+                  "option_label": "VJNT",
+                  "display_order": 5
+                },
+                {
+                  "option_code": "SBC",
+                  "option_label": "SBC",
+                  "display_order": 6
+                },
+                {
+                  "option_code": "MINORITY",
+                  "option_label": "Minority",
+                  "display_order": 7
                 }
               ]
             },

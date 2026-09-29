@@ -66,23 +66,30 @@ export default function SchemeDetailPage() {
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <Badge variant="neutral">{categoryLabel(scheme.scheme_category)}</Badge>
           <Badge variant={scheme.status === "ACTIVE" ? "ok" : "excl"}>{scheme.status}</Badge>
+          {scheme.target_persona && <Badge variant="neutral">For {scheme.target_persona.toLowerCase()} citizens</Badge>}
         </div>
         <h1 className="text-[32px] leading-tight mb-3">{scheme.scheme_name}</h1>
-        {scheme.department_name && <p className="mb-0">{scheme.department_name}</p>}
+        {scheme.department_name && <p className="mb-3">{scheme.department_name}</p>}
+        {scheme.benefit_description && (
+          <div className="bg-accent-tint border border-line rounded-sm p-4 max-w-[75ch]">
+            <p className="font-mono text-xs text-ink-soft mb-1">WHAT YOU GET</p>
+            <p className="text-base text-ink mb-0">{scheme.benefit_description}</p>
+          </div>
+        )}
       </header>
 
       <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,1fr)] gap-8">
         <div className="space-y-8">
           <section>
             <h2 className="text-2xl mb-3">Overview</h2>
-            {scheme.benefit_description && <p className="text-base mb-3">{scheme.benefit_description}</p>}
-            {scheme.description && <p className="mb-0">{scheme.description}</p>}
+            {scheme.description && <p className="text-base mb-0">{scheme.description}</p>}
           </section>
 
           <section>
-            <h2 className="text-2xl mb-3">Eligibility rules</h2>
+            <h2 className="text-2xl mb-3">Eligibility criteria</h2>
             <p className="text-sm mb-5">
-              Rule groups are combined with <code className="font-mono text-xs">{scheme.group_combining_operator}</code>.
+              Every condition below is checked against your profile. Rule
+              groups are combined with <code className="font-mono text-xs">{scheme.group_combining_operator}</code>.
             </p>
             <div className="space-y-4">
               {scheme.rule_groups.length === 0 ? (
@@ -95,12 +102,17 @@ export default function SchemeDetailPage() {
                   </div>
                   <ul className="space-y-4">
                     {group.rules.map((rule) => (
-                      <li key={rule.rule_id}>
-                        <p className="text-sm text-ink mb-1">{describeRule(rule)}</p>
-                        <p className="font-mono text-xs text-ink-soft mb-0 wrap-break-word">
+                      <li key={rule.rule_id} className="border-l-2 border-line pl-4">
+                        <p className="text-sm text-ink mb-1">{rule.rule_description || describeRule(rule)}</p>
+                        <p className="font-mono text-xs text-ink-soft mb-1 wrap-break-word">
                           {parameterLabel(rule.parameter_name)} {rule.operator} {rule.required_value}
                           {rule.operator !== "IN" && ` (${describeRequiredValue(rule)})`}
                         </p>
+                        {rule.remedy_template && (
+                          <p className="text-xs text-ink-soft italic mb-0">
+                            Not met? {rule.remedy_template}
+                          </p>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -116,22 +128,38 @@ export default function SchemeDetailPage() {
             {scheme.documents.length === 0 ? (
               <EmptyState title="No documents listed" />
             ) : (
-              <Card>
-                <ul className="space-y-4">
-                  {scheme.documents.map((document) => (
-                    <li key={document.document_id} className="flex gap-3">
-                      <FileText className="h-4 w-4 mt-1 text-accent-ink shrink-0" aria-hidden="true" />
-                      <div>
-                        <p className="text-sm text-ink mb-1">{documentLabel(document.document_type)}</p>
-                        <Badge variant={document.mandatory_flag ? "excl" : "neutral"}>
-                          {document.mandatory_flag ? "Mandatory" : "Additional"}
-                        </Badge>
-                        {document.description && <p className="text-xs mt-2 mb-0">{document.description}</p>}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
+              <>
+                <Card className="mb-4">
+                  <p className="font-mono text-xs text-ink-soft mb-3">MANDATORY</p>
+                  <ul className="space-y-4">
+                    {scheme.documents.filter((d) => d.mandatory_flag).map((document) => (
+                      <li key={document.document_id} className="flex gap-3">
+                        <FileText className="h-4 w-4 mt-1 text-accent-ink shrink-0" aria-hidden="true" />
+                        <div>
+                          <p className="text-sm text-ink mb-1">{documentLabel(document.document_type)}</p>
+                          {document.description && <p className="text-xs mt-2 mb-0">{document.description}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+                {scheme.documents.filter((d) => !d.mandatory_flag).length > 0 && (
+                  <Card>
+                    <p className="font-mono text-xs text-ink-soft mb-3">SUPPORTING</p>
+                    <ul className="space-y-4">
+                      {scheme.documents.filter((d) => !d.mandatory_flag).map((document) => (
+                        <li key={document.document_id} className="flex gap-3">
+                          <FileText className="h-4 w-4 mt-1 text-ink-soft shrink-0" aria-hidden="true" />
+                          <div>
+                            <p className="text-sm text-ink mb-1">{documentLabel(document.document_type)}</p>
+                            {document.description && <p className="text-xs mt-2 mb-0">{document.description}</p>}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+              </>
             )}
           </section>
 

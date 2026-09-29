@@ -9,6 +9,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import cache, citizen_key, invalidate_citizen
 from app.models.citizen import CitizenMaster
 from app.repositories.citizen_repository import CitizenRepository
 from app.schemas.citizen import (
@@ -59,11 +60,28 @@ class CitizenService:
         return _to_response(loaded or created)
 
     async def get_citizen(self, citizen_id: uuid.UUID) -> Optional[CitizenResponse]:
+        # Short-TTL read cache: the My Profile page hits this on every visit
+        # and the remote DB round trips dominate its latency. 60s bounds any
+        # staleness; every write path (profile edit, normalization) calls
+        # invalidate_citizen so a read is never stale past its own write.
+        cache_key = citizen_key(citizen_id)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return CitizenResponse.model_validate(cached)
+
         citizen = await self.repo.get_by_id(citizen_id)
-        return _to_response(citizen) if citizen else None
+        if not citizen:
+            return None
+        response = _to_response(citizen)
+        cache.set(cache_key, response.model_dump(), ttl_seconds=60)
+        return response
 
     async def update_citizen(
         self, citizen_id: uuid.UUID, data: CitizenUpdate
     ) -> Optional[CitizenResponse]:
         citizen = await self.repo.update(citizen_id, data)
-        return _to_response(citizen) if citizen else None
+        if not citizen:
+            return None
+        # The cached profile read is now outdated by definition.
+        invalidate_citizen(citizen_id)
+        return _to_response(citizen)

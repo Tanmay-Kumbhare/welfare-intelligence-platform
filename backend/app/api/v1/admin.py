@@ -35,6 +35,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import require_admin
+from app.cache import cache, invalidate_schemes, invalidate_form
 from app.database import get_db
 from app.models.auth import UserAccount, UserRole
 from app.models.citizen import CitizenMaster
@@ -262,7 +263,11 @@ async def admin_update_scheme(
     body: SchemeUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    """Update permitted scheme metadata. Rule tables are never touched here."""
+    """Update permitted scheme metadata. Rule tables are never touched here.
+
+    Invalidates the scheme reference-data cache so citizens immediately see
+    the updated metadata.
+    """
     scheme = await db.get(SchemeMaster, scheme_id)
     if scheme is None:
         raise HTTPException(status_code=404, detail="Scheme not found")
@@ -282,6 +287,8 @@ async def admin_update_scheme(
             setattr(scheme, field, value)
 
     await db.flush()
+    # The scheme catalogue/detail served to citizens changed.
+    invalidate_schemes()
 
     rule_count_result = await db.execute(
         select(func.count())
@@ -952,4 +959,28 @@ async def admin_verify_rule_provenance(
         "rule_provenance_id": provenance.rule_provenance_id,
         "verification_status": provenance.verification_status,
         "verified_at": provenance.verified_at,
+    }
+
+
+# ------------------------------------------------------------------
+# Reference-data cache ops
+# ------------------------------------------------------------------
+
+
+@router.get("/cache/stats")
+async def admin_cache_stats() -> Any:
+    """Hit/miss/entries snapshot of the reference-data TTL cache."""
+    return cache.stats()
+
+
+@router.post("/cache/clear")
+async def admin_cache_clear() -> Any:
+    """Drop all cached reference data (schemes, forms). Next reads repopulate
+    from PostgreSQL. Use after out-of-band data changes or for debugging."""
+    schemes_removed = invalidate_schemes()
+    forms_removed = invalidate_form()
+    return {
+        "cleared": True,
+        "schemes_keys_removed": schemes_removed,
+        "forms_keys_removed": forms_removed,
     }

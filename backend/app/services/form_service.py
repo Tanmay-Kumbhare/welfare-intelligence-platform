@@ -4,12 +4,21 @@ Form service — orchestration for form read APIs.
 Maps ORM form hierarchies to response schemas with ACTIVE filtering,
 display-order sorting, and condition depends_on codes resolved for the
 frontend. Routers never talk to the repository directly.
+
+Active form definitions are static between admin edits, so the active
+form detail (the full hierarchy the citizen form renders from) and the
+active-forms list are served through the reference-data TTL cache.
+Cached values are serialized Pydantic DTOs — never session-bound ORM
+objects. Submission writes and user-specific reads are NOT cached.
+Invalidation: any mutation of form definitions must call
+app.cache.invalidate_form (see app.cache key builders).
 """
 
 from __future__ import annotations
 
 from typing import Sequence
 
+from app.cache import cache, form_active_key, forms_list_key
 from app.models.form import (
     FormCondition,
     FormDefinition,
@@ -145,11 +154,16 @@ class FormService:
         questions/options surface here; the version snapshot returned is
         the highest active one.
         """
+        cache_key = f"{forms_list_key()}:{target_citizen_type or 'all'}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         rows = await self.repo.list_active_versions(target_citizen_type)
         latest_by_code: dict[str, FormDefinition] = {}
         for form in rows:  # already ordered by (code, version desc)
             latest_by_code.setdefault(form.form_code, form)
-        return [
+        summaries = [
             FormSummary(
                 form_id=f.form_id,
                 form_code=f.form_code,
@@ -161,12 +175,21 @@ class FormService:
             )
             for f in sorted(latest_by_code.values(), key=lambda f: f.form_code)
         ]
+        cache.set(cache_key, [s.model_dump() for s in summaries])
+        return summaries
 
     async def get_active_form(self, form_code: str) -> FormDetail:
+        cache_key = form_active_key(form_code)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return FormDetail.model_validate(cached)
+
         form = await self.repo.get_active_by_code(form_code)
         if form is None:
             raise FormNotFoundError(f"Form '{form_code}' not found or not active")
-        return self._form_detail(form)
+        detail = self._form_detail(form)
+        cache.set(cache_key, detail.model_dump())
+        return detail
 
     async def list_versions(self, form_code: str) -> FormVersionsResponse:
         versions = await self.repo.list_versions(form_code)

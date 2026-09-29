@@ -344,11 +344,12 @@ def forms_env(client, tracked):
 
 
 def _make_citizen(client: TestClient, tracked: dict) -> uuid.UUID:
-    suffix = uuid.uuid4().hex[:8]
+    # Translate hex digits to letters so the name passes alphabetic-only validation.
+    suffix = uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnopq"[:10]))
     resp = client.post(
         "/api/v1/citizens/",
         json={
-            "full_name": f"Phase 2A Test {suffix}",
+            "full_name": f"PhaseTwoA Test {suffix}",
             "date_of_birth": "1995-04-04",
             "gender": "MALE",
             "citizen_type": "GENERAL",

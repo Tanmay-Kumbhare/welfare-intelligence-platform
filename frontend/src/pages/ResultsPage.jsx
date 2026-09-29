@@ -26,6 +26,41 @@ function SchemeMeta({ scheme }) {
   return <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft">{scheme.department_name && <span>{scheme.department_name}</span>}{scheme.scheme_category && <Badge variant="neutral">{categoryLabel(scheme.scheme_category)}</Badge>}<Badge variant={scheme.status === "ACTIVE" ? "ok" : "excl"}>{scheme.status}</Badge></div>;
 }
 
+function SchemeDocuments({ item }) {
+  if (!item.scheme_documents || item.scheme_documents.length === 0) return null;
+
+  const missingCount = item.scheme_documents.filter(d => d.required && d.status !== "VALID").length;
+
+  return (
+    <div className="mt-4 pt-4 border-t border-line">
+      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+        Documents
+        {item.document_status === "COMPLETE" ? (
+          <Badge variant="ok">COMPLETE</Badge>
+        ) : (
+          <Badge variant="excl">MISSING DOCUMENTS</Badge>
+        )}
+      </h4>
+      <ul className="space-y-1 mb-3">
+        {item.scheme_documents.map(d => (
+          <li key={d.document_type} className="text-sm flex items-center gap-2">
+            {d.status === "VALID" ? <CheckCircle className="h-4 w-4 text-ok" /> : <XCircle className="h-4 w-4 text-excl" />}
+            <span className={d.status === "VALID" ? "text-ink" : "text-excl-ink font-medium"}>
+              {d.name} {!d.required && <span className="text-ink-soft font-normal">(Optional)</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {missingCount > 0 && (
+        <p className="text-sm text-excl-ink mb-3">{missingCount} required document{missingCount !== 1 ? 's' : ''} pending</p>
+      )}
+      <Button to="/documents" variant="secondary" size="sm">
+        {missingCount > 0 ? "Upload Documents" : "View Documents"}
+      </Button>
+    </div>
+  );
+}
+
 export default function ResultsPage() {
   const { citizenId } = useParams();
   const [data, setData] = useState(null);
@@ -97,7 +132,7 @@ export default function ResultsPage() {
 
     <section className="mb-10" aria-labelledby="eligible-heading">
       <div className="flex items-center gap-2 border-b border-line pb-2.5 mb-4.5"><CheckCircle className="h-5 w-5 text-ok" aria-hidden="true" /><h2 id="eligible-heading" className="text-2xl mb-0">Eligible schemes <span className="font-sans text-sm font-normal text-ink-soft">({eligible.length})</span></h2></div>
-      {eligible.length === 0 ? <EmptyState title="No evaluated schemes currently match..." message="No evaluated schemes currently match your information." /> : <div className="space-y-4">{eligible.map((item) => <Card key={item.scheme.scheme_id} eligible><div className="flex flex-wrap items-start justify-between gap-4"><div><h3 className="text-xl mb-2">{item.scheme.scheme_name}</h3><SchemeMeta scheme={item.scheme} /></div><Button to={`/schemes/${item.scheme.scheme_id}`} variant="secondary" size="sm">View scheme</Button></div><p className="text-sm mt-4 mb-0">Your information meets the stored eligibility requirements.</p>{(item.scheme.benefit_description || item.scheme.description) && <p className="text-sm mt-2 mb-0">{item.scheme.benefit_description || item.scheme.description}</p>}</Card>)}</div>}
+      {eligible.length === 0 ? <EmptyState title="No evaluated schemes currently match..." message="No evaluated schemes currently match your information." /> : <div className="space-y-4">{eligible.map((item) => <Card key={item.scheme.scheme_id} eligible><div className="flex flex-wrap items-start justify-between gap-4"><div><h3 className="text-xl mb-2">{item.scheme.scheme_name}</h3><SchemeMeta scheme={item.scheme} /></div><Button to={`/schemes/${item.scheme.scheme_id}`} variant="secondary" size="sm">View scheme</Button></div><p className="text-sm mt-4 mb-0">Your information meets the stored eligibility requirements.</p>{(item.scheme.benefit_description || item.scheme.description) && <p className="text-sm mt-2 mb-0">{item.scheme.benefit_description || item.scheme.description}</p>}<SchemeDocuments item={item} /></Card>)}</div>}
     </section>
 
     <section className="mb-10" aria-labelledby="excluded-heading">

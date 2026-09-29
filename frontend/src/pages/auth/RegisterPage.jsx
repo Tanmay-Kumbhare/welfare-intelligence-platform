@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
@@ -9,25 +9,42 @@ import Card from "../../components/ui/Card";
 import { ErrorState } from "../../components/ui/StatusStates";
 import { authService } from "../../services/api";
 import { saveToken, saveUser } from "../../services/auth";
-
-const TODAY = new Date().toISOString().slice(0, 10);
+import {
+  buildFullName,
+  calculateAge,
+  hasNoErrors,
+  validateDob,
+  validateEmail,
+  validateFirstName,
+  validateIncome,
+  validateLastName,
+  validateMiddleName,
+  validateMobile,
+} from "../../utils/profileValidation";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
+    // Name parts — composed into full_name before sending to the API.
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    // Account credentials
     email: "",
     password: "",
-    full_name: "",
+    // Identity / contact
     date_of_birth: "",
     gender: "",
     citizen_type: "GENERAL",
     mobile_number: "",
+    // Demographic
     education_level: "",
     occupation: "",
     family_size: "",
     marital_status: "",
     social_category: "",
     disability_status: "NONE",
+    // Financial
     annual_income: "",
     employment_status: "",
     income_source: "",
@@ -35,34 +52,64 @@ export default function RegisterPage() {
     land_holding_size: "",
     is_bpl_card_holder: false,
     is_income_tax_payer: false,
+    // Location
     state: "",
     district: "",
     village_city: "",
     area_type: "",
   });
+
+  // Per-field error messages.  null = valid (or untouched).
+  const [fieldErrors, setFieldErrors] = useState({});
+  // Top-level form-wide error (e.g. API error).
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const update = (next) => setForm((current) => ({ ...current, ...next }));
 
+  // Re-validate a single field on every change and clear the error once valid.
+  const touch = (field, validatorFn, value) => {
+    const err = validatorFn(value);
+    setFieldErrors((current) => ({ ...current, [field]: err }));
+  };
+
+  // Derived display-only age from DOB.
+  const age = calculateAge(form.date_of_birth);
+
   const submit = async (event) => {
     event.preventDefault();
     setError("");
-    if (!form.email || !form.password || !form.full_name || !form.date_of_birth) {
-      setError("Please enter your email, password, full name and date of birth.");
+
+    // Validate all fields that need it.
+    const errors = {
+      firstName: validateFirstName(form.firstName),
+      middleName: validateMiddleName(form.middleName),
+      lastName: validateLastName(form.lastName),
+      email: validateEmail(form.email, { required: true }),
+      mobile_number: validateMobile(form.mobile_number),
+      date_of_birth: validateDob(form.date_of_birth),
+      annual_income: validateIncome(form.annual_income),
+    };
+
+    if (!form.password) {
+      errors.password = "Password is required.";
+    }
+
+    setFieldErrors(errors);
+
+    if (!hasNoErrors(errors)) {
+      setError("Please correct the highlighted fields before continuing.");
       return;
     }
-    if (form.date_of_birth >= TODAY) {
-      setError("Date of birth must be in the past.");
-      return;
-    }
+
     setLoading(true);
     try {
+      const fullName = buildFullName(form.firstName, form.middleName, form.lastName);
       const response = await authService.register({
         email: form.email,
         password: form.password,
         citizen: {
-          full_name: form.full_name.trim(),
+          full_name: fullName,
           date_of_birth: form.date_of_birth,
           gender: form.gender || null,
           mobile_number: form.mobile_number || null,
@@ -71,24 +118,18 @@ export default function RegisterPage() {
           demographic: {
             education_level: form.education_level || null,
             occupation: form.occupation || null,
-            family_size: form.family_size
-              ? Number(form.family_size)
-              : undefined,
+            family_size: form.family_size ? Number(form.family_size) : undefined,
             marital_status: form.marital_status || null,
             social_category: form.social_category || null,
             disability_status: form.disability_status || "NONE",
             type_specific_metadata: null,
           },
           financial: {
-            annual_income: form.annual_income
-              ? Number(form.annual_income)
-              : undefined,
+            annual_income: form.annual_income !== "" ? Number(form.annual_income) : undefined,
             employment_status: form.employment_status || null,
             income_source: form.income_source || null,
             poverty_category: form.poverty_category || null,
-            land_holding_size: form.land_holding_size
-              ? Number(form.land_holding_size)
-              : undefined,
+            land_holding_size: form.land_holding_size ? Number(form.land_holding_size) : undefined,
             is_bpl_card_holder: Boolean(form.is_bpl_card_holder),
             is_income_tax_payer: Boolean(form.is_income_tax_payer),
           },
@@ -132,6 +173,7 @@ export default function RegisterPage() {
       <Card>
         <div className="max-w-[560px] mx-auto">
           <form onSubmit={submit} noValidate className="space-y-7">
+            {/* ── Account credentials ── */}
             <div className="grid md:grid-cols-2 gap-x-5">
               <Input
                 id="reg-email"
@@ -139,7 +181,12 @@ export default function RegisterPage() {
                 type="email"
                 required
                 value={form.email}
-                onChange={(event) => update({ email: event.target.value })}
+                error={fieldErrors.email}
+                onChange={(event) => {
+                  const v = event.target.value;
+                  update({ email: v });
+                  touch("email", (val) => validateEmail(val, { required: true }), v);
+                }}
                 autoComplete="email"
               />
               <PasswordInput
@@ -147,33 +194,84 @@ export default function RegisterPage() {
                 label="Password"
                 required
                 value={form.password}
-                onChange={(event) => update({ password: event.target.value })}
+                error={fieldErrors.password}
+                onChange={(event) => {
+                  const v = event.target.value;
+                  update({ password: v });
+                  setFieldErrors((cur) => ({ ...cur, password: v ? null : "Password is required." }));
+                }}
                 autoComplete="new-password"
                 hint="Use a password only you know."
               />
             </div>
 
+            {/* ── Identity / name ── */}
             <div className="border-t border-line pt-6">
               <h2 className="text-xl mb-3">Your profile</h2>
+              <div className="grid md:grid-cols-3 gap-x-5">
+                <Input
+                  id="reg-first-name"
+                  label="First name"
+                  required
+                  value={form.firstName}
+                  error={fieldErrors.firstName}
+                  onChange={(event) => {
+                    const v = event.target.value;
+                    update({ firstName: v });
+                    touch("firstName", validateFirstName, v);
+                  }}
+                  autoComplete="given-name"
+                />
+                <Input
+                  id="reg-middle-name"
+                  label="Middle name"
+                  value={form.middleName}
+                  error={fieldErrors.middleName}
+                  onChange={(event) => {
+                    const v = event.target.value;
+                    update({ middleName: v });
+                    touch("middleName", validateMiddleName, v);
+                  }}
+                  autoComplete="additional-name"
+                />
+                <Input
+                  id="reg-last-name"
+                  label="Last name"
+                  required
+                  value={form.lastName}
+                  error={fieldErrors.lastName}
+                  onChange={(event) => {
+                    const v = event.target.value;
+                    update({ lastName: v });
+                    touch("lastName", validateLastName, v);
+                  }}
+                  autoComplete="family-name"
+                />
+              </div>
+
               <div className="grid md:grid-cols-2 gap-x-5">
-                <Input
-                  id="reg-name"
-                  label="Full name"
-                  required
-                  value={form.full_name}
-                  onChange={(event) => update({ full_name: event.target.value })}
-                  autoComplete="name"
-                />
-                <Input
-                  id="reg-dob"
-                  label="Date of birth"
-                  required
-                  type="date"
-                  max={TODAY}
-                  value={form.date_of_birth}
-                  onChange={(event) => update({ date_of_birth: event.target.value })}
-                  autoComplete="bday"
-                />
+                <div>
+                  <Input
+                    id="reg-dob"
+                    label="Date of birth"
+                    required
+                    type="date"
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={form.date_of_birth}
+                    error={fieldErrors.date_of_birth}
+                    onChange={(event) => {
+                      const v = event.target.value;
+                      update({ date_of_birth: v });
+                      touch("date_of_birth", validateDob, v);
+                    }}
+                    autoComplete="bday"
+                  />
+                  {age !== null && !fieldErrors.date_of_birth && (
+                    <p className="text-xs text-ink-soft -mt-3 mb-5">
+                      Age: <strong>{age}</strong> years
+                    </p>
+                  )}
+                </div>
                 <Select
                   id="reg-gender"
                   label="Gender"
@@ -199,22 +297,33 @@ export default function RegisterPage() {
                 <Input
                   id="reg-mobile"
                   label="Mobile number"
+                  required
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.mobile_number}
-                  onChange={(event) => update({ mobile_number: event.target.value })}
+                  error={fieldErrors.mobile_number}
+                  onChange={(event) => {
+                    // Strip non-digits as the user types.
+                    const v = event.target.value.replace(/\D/g, "").slice(0, 10);
+                    update({ mobile_number: v });
+                    touch("mobile_number", validateMobile, v);
+                  }}
                   autoComplete="tel"
                 />
                 <Input
                   id="reg-email-profile"
-                  label="Email"
+                  label="Email (login)"
                   type="email"
                   value={form.email}
-                  onChange={(event) => update({ email: event.target.value })}
                   readOnly
                   className="opacity-70"
+                  hint="Filled from the email address above."
                 />
               </div>
             </div>
 
+            {/* ── Demographic / Financial / Location ── */}
             <div className="border-t border-line pt-6">
               <h2 className="text-xl mb-3">Details you want to share</h2>
               <div className="grid md:grid-cols-2 gap-x-5">
@@ -234,6 +343,7 @@ export default function RegisterPage() {
                   id="reg-family-size"
                   label="Family size"
                   type="number"
+                  min={1}
                   value={form.family_size}
                   onChange={(event) => update({ family_size: event.target.value })}
                 />
@@ -277,8 +387,15 @@ export default function RegisterPage() {
                   id="reg-income"
                   label="Annual income (₹)"
                   type="number"
+                  min={0}
+                  inputMode="numeric"
                   value={form.annual_income}
-                  onChange={(event) => update({ annual_income: event.target.value })}
+                  error={fieldErrors.annual_income}
+                  onChange={(event) => {
+                    const v = event.target.value;
+                    update({ annual_income: v });
+                    touch("annual_income", validateIncome, v);
+                  }}
                 />
                 <Select
                   id="reg-emp"
@@ -315,6 +432,7 @@ export default function RegisterPage() {
                   id="reg-land"
                   label="Land holding size (hectares)"
                   type="number"
+                  min={0}
                   value={form.land_holding_size}
                   onChange={(event) => update({ land_holding_size: event.target.value })}
                 />
@@ -322,7 +440,9 @@ export default function RegisterPage() {
                   id="reg-bpl"
                   label="BPL card holder"
                   value={String(form.is_bpl_card_holder)}
-                  onChange={(event) => update({ is_bpl_card_holder: event.target.value === "true" })}
+                  onChange={(event) =>
+                    update({ is_bpl_card_holder: event.target.value === "true" })
+                  }
                 >
                   <option value="false">No</option>
                   <option value="true">Yes</option>
@@ -331,7 +451,9 @@ export default function RegisterPage() {
                   id="reg-tax"
                   label="Income-tax payer"
                   value={String(form.is_income_tax_payer)}
-                  onChange={(event) => update({ is_income_tax_payer: event.target.value === "true" })}
+                  onChange={(event) =>
+                    update({ is_income_tax_payer: event.target.value === "true" })
+                  }
                 >
                   <option value="false">No</option>
                   <option value="true">Yes</option>

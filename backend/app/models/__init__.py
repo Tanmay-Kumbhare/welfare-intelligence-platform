@@ -1,8 +1,9 @@
-﻿"""ORM models package. Import all models here so Alembic autodiscovery works."""
+"""ORM models package. Import all models here so Alembic autodiscovery works."""
 
 from app.models.citizen import CitizenMaster, DemographicProfile, FinancialProfile, LocationProfile
 from app.models.scheme import SchemeMaster, SchemeRuleGroup, SchemeEligibilityRule, SchemeDocumentMaster
 from app.models.assessment import EligibilityAssessment
+from app.models.document import CitizenDocument
 
 # Phase 1: dynamic forms
 from app.models.form import (
@@ -55,6 +56,7 @@ __all__ = [
     "SchemeRuleGroup",
     "SchemeEligibilityRule",
     "SchemeDocumentMaster",
+    "CitizenDocument",
     "EligibilityAssessment",
     # Phase 1: forms
     "FormDefinition",

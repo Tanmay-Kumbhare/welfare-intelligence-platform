@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -33,10 +33,45 @@ async def get_citizen_recommendations(
     assessment_repo = AssessmentRepository(db)
     assessments = await assessment_repo.get_citizen_assessments(citizen_id)
 
+    from app.services.document_service import DocumentService
+    doc_service = DocumentService(db)
+    citizen_docs = await doc_service.get_citizen_documents(citizen_id)
+    citizen_doc_map = {d.requirement_type: d for d in citizen_docs}
+
     eligible = []
     ineligible = []
 
     for a in assessments:
+        scheme_documents = []
+        is_complete = True
+        
+        for req in a.scheme.documents:
+            c_doc = citizen_doc_map.get(req.document_type)
+            
+            if not c_doc:
+                status = "MISSING"
+                msg = None
+            else:
+                status = c_doc.validation_status
+                msg = c_doc.validation_message
+                
+            if req.mandatory_flag and status != "VALID":
+                is_complete = False
+                
+            scheme_documents.append(
+                {
+                    "document_type": req.document_type,
+                    "name": req.document_type.replace("_", " ").title(),
+                    "required": req.mandatory_flag,
+                    "status": status,
+                    "validation_message": msg
+                }
+            )
+            
+        doc_status = "NOT_APPLICABLE"
+        if len(a.scheme.documents) > 0:
+            doc_status = "COMPLETE" if is_complete else "MISSING_DOCUMENTS"
+
         item = RecommendationItem(
             scheme=a.scheme,
             eligibility_result=a.eligibility_result,
@@ -44,6 +79,8 @@ async def get_citizen_recommendations(
             evaluation_details=a.evaluation_details,
             assessment_date=a.assessment_date,
             documents=a.scheme.documents,
+            document_status=doc_status,
+            scheme_documents=scheme_documents,
         )
         if a.eligibility_result:
             eligible.append(item)

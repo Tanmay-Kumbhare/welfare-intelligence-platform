@@ -86,16 +86,44 @@ export default function CheckEligibilityPage() {
     Promise.all([loadCitizen(), formService.getActive(FORM_CODE)])
       .then(([citizen, formResponse]) => {
         if (cancelled) return;
-        setForm(formResponse.data);
+        
         if (citizen) {
+          const profileTypes = citizen.profile_types || [];
+          
+          // Filter sections based on selected profile types
+          const sectionToTypes = {
+            "EDUCATION_INFO": ["STUDENT"],
+            "AGRICULTURE_INFO": ["FARMER"],
+            "EMPLOYMENT_INFO": ["EMPLOYEE", "HOMEMAKER", "BUSINESS"], // Ensure it's shown for business too
+            "BUSINESS_INFO": ["BUSINESS"],
+            "DISABILITY_INFO": ["PWD"],
+          };
+          
+          const filteredSections = formResponse.data.sections.filter(sec => {
+            const targetTypes = sectionToTypes[sec.section_code];
+            if (!targetTypes) return true; // Common sections (Personal, Family, Financial, etc.) are shown to all
+            
+            // Special rule: Show Disability if PWD selected OR disability_status is YES
+            if (sec.section_code === "DISABILITY_INFO") {
+              if (profileTypes.includes("PWD")) return true;
+              if (citizen.demographic?.disability_status && citizen.demographic.disability_status !== "NONE") return true;
+            }
+            
+            return targetTypes.some(t => profileTypes.includes(t));
+          });
+          
+          setForm({ ...formResponse.data, sections: filteredSections });
+          
           setIdentity({
             citizenId: citizen.citizen_id,
             fullName: citizen.full_name,
             dateOfBirth: citizen.date_of_birth,
             gender: citizen.gender,
+            profileTypes,
           });
           setPhase("form");
         } else {
+          setForm(formResponse.data);
           setPhase("no-citizen");
         }
       })

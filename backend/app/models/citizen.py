@@ -1,4 +1,4 @@
-﻿"""
+"""
 Citizen domain ORM models.
 
 Tables:
@@ -44,6 +44,8 @@ class CitizenMaster(Base):
         nullable=True,
         index=True,
     )
+    # Support for multiple profile types (e.g., Student + Farmer)
+    profile_types: Mapped[list[str] | None] = mapped_column(JSONB, server_default='[]')
 
     # Relationships
     demographic_profile: Mapped["DemographicProfile | None"] = relationship(

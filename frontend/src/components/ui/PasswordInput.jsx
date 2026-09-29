@@ -3,13 +3,13 @@ import { Eye, EyeOff } from "lucide-react";
 
 /**
  * Password input with a show/hide (eye) toggle.
- * Forwards everything else to the shared <Input /> component.
+ * Supports an `error` prop for inline validation messages.
  */
-export default function PasswordInput({ id, label, hint, required, className = "", ...props }) {
+export default function PasswordInput({ id, label, hint, error, required, className = "", ...props }) {
   const [visible, setVisible] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative mb-5">
       <label htmlFor={id} className="block text-[13px] font-medium text-ink mb-1.5">
         {label}
         {required && <span className="text-excl-ink"> *</span>}
@@ -19,7 +19,11 @@ export default function PasswordInput({ id, label, hint, required, className = "
           id={id}
           type={visible ? "text" : "password"}
           required={required}
-          className={`w-full font-sans text-sm px-3 py-2.5 pr-11 bg-white text-ink border border-line rounded-sm focus:outline-2 focus:outline-accent focus:outline-offset-1 ${className}`}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
+          className={`w-full font-sans text-sm px-3 py-2.5 pr-11 bg-white text-ink border rounded-sm focus:outline-2 focus:outline-accent focus:outline-offset-1 ${
+            error ? "border-excl-ink" : "border-line"
+          } ${className}`}
           {...props}
         />
         <button
@@ -33,7 +37,8 @@ export default function PasswordInput({ id, label, hint, required, className = "
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
-      {hint && <p className="text-xs text-ink-soft mt-1">{hint}</p>}
+      {hint && !error && <p id={`${id}-hint`} className="text-xs text-ink-soft mt-1">{hint}</p>}
+      {error && <p id={`${id}-error`} className="text-[13px] text-excl-ink mt-1.5">{error}</p>}
     </div>
   );
 }

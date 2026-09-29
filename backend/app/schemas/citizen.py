@@ -1,12 +1,13 @@
-﻿"""Pydantic v2 schemas for citizen domain."""
+"""Pydantic v2 schemas for citizen domain."""
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import date
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 # ------------------------------------------------------------------
@@ -52,9 +53,45 @@ class CitizenCreate(BaseModel):
     mobile_number: Optional[str] = None
     email_id: Optional[str] = None
     citizen_type: str = Field(..., pattern="^(FARMER|STUDENT|SENIOR|GENERAL)$")
+    profile_types: list[str] = Field(default_factory=list)
     demographic: DemographicProfileCreate
     financial: FinancialProfileCreate
     location: LocationProfileCreate
+
+    @field_validator("full_name")
+    @classmethod
+    def name_no_numbers_or_special(cls, v: str) -> str:
+        v = v.strip()
+        # Reject strings that contain digits or non-alphabetic/space chars.
+        # Indian names may contain letters from any Unicode script, so we
+        # allow Unicode letters (\w minus digits) and spaces.
+        if re.search(r"[0-9@#$%^&*()+=\[\]{}<>|/\\\"'`~!]", v):
+            raise ValueError(
+                "Name must contain only alphabetic characters and spaces."
+            )
+        if len(v) < 2:
+            raise ValueError("Name must be at least 2 characters.")
+        return v
+
+    @field_validator("mobile_number")
+    @classmethod
+    def mobile_must_be_10_digits(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return v
+        digits_only = re.sub(r"\D", "", v)
+        if len(digits_only) != 10:
+            raise ValueError("Mobile number must be exactly 10 digits.")
+        return digits_only
+
+    @field_validator("email_id")
+    @classmethod
+    def email_id_format(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v.strip() == "":
+            return v
+        # Basic email validation: local@domain.tld
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", v.strip()):
+            raise ValueError("Please enter a valid email address.")
+        return v.strip()
 
     @field_validator("date_of_birth")
     @classmethod
@@ -62,6 +99,15 @@ class CitizenCreate(BaseModel):
         from datetime import date as d
         if v >= d.today():
             raise ValueError("Date of birth must be in the past")
+        return v
+
+    @field_validator("profile_types")
+    @classmethod
+    def validate_profile_types(cls, v: list[str]) -> list[str]:
+        allowed = {"STUDENT", "FARMER", "EMPLOYEE", "BUSINESS", "SENIOR_CITIZEN", "HOMEMAKER", "PWD", "OTHER"}
+        for pt in v:
+            if pt not in allowed:
+                raise ValueError(f"Invalid profile type: {pt}")
         return v
 
 
@@ -119,6 +165,7 @@ class CitizenResponse(BaseModel):
     mobile_number: Optional[str] = None
     email_id: Optional[str] = None
     citizen_type: str
+    profile_types: list[str] = []
     registration_date: Optional[date] = None
     verification_status: str
     demographic: Optional[DemographicProfileResponse] = None

@@ -6,9 +6,11 @@ import { authService } from "../../services/api";
 
 const PRIMARY_LINKS = [
   { to: "/", label: "Home", end: true },
+  { to: "/dashboard", label: "Dashboard" },
   { to: "/schemes", label: "Schemes" },
   { to: "/explore", label: "Explore" },
   { to: "/check-eligibility", label: "Check Eligibility" },
+  { to: "/documents", label: "Documents" },
   { to: "/profile", label: "My Profile" },
 ];
 

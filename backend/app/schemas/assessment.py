@@ -1,4 +1,4 @@
-﻿"""Pydantic v2 schemas for eligibility assessment domain."""
+"""Pydantic v2 schemas for eligibility assessment domain."""
 
 from __future__ import annotations
 
@@ -9,6 +9,14 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.scheme import DocumentResponse, SchemeResponse
+
+
+class SchemeDocumentStatus(BaseModel):
+    document_type: str
+    name: str
+    required: bool
+    status: str # "VALID", "INVALID", "MISSING", "PENDING"
+    validation_message: Optional[str] = None
 
 
 class RuleEvaluationDetail(BaseModel):
@@ -55,6 +63,8 @@ class RecommendationItem(BaseModel):
     evaluation_details: Optional[dict[str, Any]] = None
     assessment_date: date
     documents: list[DocumentResponse] = []
+    document_status: Optional[str] = None
+    scheme_documents: list[SchemeDocumentStatus] = []
 
 
 class RecommendationsResponse(BaseModel):

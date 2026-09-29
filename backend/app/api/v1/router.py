@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter
+from fastapi import APIRouter
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.citizens import router as citizens_router
@@ -7,6 +7,7 @@ from app.api.v1.eligibility import router as eligibility_router
 from app.api.v1.forms import router as forms_router
 from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.documents import router as documents_router
 
 api_router = APIRouter()
 
@@ -17,3 +18,4 @@ api_router.include_router(schemes_router, prefix="/schemes", tags=["Schemes"])
 api_router.include_router(eligibility_router, prefix="/eligibility", tags=["Eligibility"])
 api_router.include_router(recommendations_router, prefix="/recommendations", tags=["Recommendations"])
 api_router.include_router(forms_router, prefix="/forms", tags=["Forms"])
+api_router.include_router(documents_router, prefix="/documents", tags=["Documents"])

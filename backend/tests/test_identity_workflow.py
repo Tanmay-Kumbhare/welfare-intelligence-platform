@@ -80,7 +80,8 @@ def tracked():
 def _register(client, tracked, **overrides) -> dict:
     """Create a citizen the way the frontend identity gate does; returns the
     registration response body (citizen_id included)."""
-    suffix = uuid.uuid4().hex[:8]
+    # Translate hex digits to letters so the name passes alphabetic-only validation.
+    suffix = uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnopq"[:10]))
     payload = {
         "full_name": f"Identity Test {suffix}",
         "date_of_birth": "2001-03-15",

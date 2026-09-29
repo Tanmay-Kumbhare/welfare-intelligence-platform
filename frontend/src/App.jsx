@@ -21,6 +21,9 @@ import AdminSchemesPage from "./pages/admin/AdminSchemesPage";
 import AdminSubmissionsPage from "./pages/admin/AdminSubmissionsPage";
 import AdminSourcesPage from "./pages/admin/AdminSourcesPage";
 
+import DocumentsPage from "./pages/DocumentsPage";
+import DashboardPage from "./pages/DashboardPage";
+
 function App() {
   return (
     <BrowserRouter>
@@ -34,6 +37,7 @@ function App() {
 
           <Route element={<AuthLayout />}>
             <Route element={<ProfileCompletionGate />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/schemes" element={<SchemesPage />} />
               <Route path="/schemes/:id" element={<SchemeDetailPage />} />
               <Route path="/explore" element={<ExplorePage />} />
@@ -45,6 +49,7 @@ function App() {
           </Route>
 
           <Route path="/check-eligibility" element={<CheckEligibilityPage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
         </Route>
 
         {/* Admin area: completely separate shell — its own header, sidebar

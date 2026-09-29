@@ -332,9 +332,10 @@ def _qid(client, form_code: str, question_code: str) -> str:
 
 
 def _make_citizen(client, tracked, **overrides) -> uuid.UUID:
-    suffix = uuid.uuid4().hex[:8]
+    # Translate hex digits to letters so the name passes alphabetic-only validation.
+    suffix = uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnopq"[:10]))
     payload = {
-        "full_name": f"Phase 2C Test {suffix}",
+        "full_name": f"PhaseTwoCee Test {suffix}",
         "date_of_birth": "2000-06-15",
         "gender": "FEMALE",
         "citizen_type": "GENERAL",

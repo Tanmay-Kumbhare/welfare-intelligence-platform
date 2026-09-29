@@ -8,8 +8,33 @@ import { EmptyState, ErrorState, LoadingState } from "../components/ui/StatusSta
 import { authService, citizenService, formService } from "../services/api";
 import { getUser, clearAuth } from "../services/auth";
 import { extractApiErrorMessage } from "../utils/apiError";
+import {
+  buildFullName,
+  calculateAge,
+  hasNoErrors,
+  splitFullName,
+  validateDob,
+  validateEmail,
+  validateFirstName,
+  validateIncome,
+  validateLastName,
+  validateMiddleName,
+  validateMobile,
+} from "../utils/profileValidation";
+
 
 const FORM_CODE = "GENERAL_CITIZEN_PROFILE";
+
+const PROFILE_TYPE_OPTIONS = [
+  { value: "STUDENT", label: "Student" },
+  { value: "FARMER", label: "Farmer" },
+  { value: "EMPLOYEE", label: "Employee / Worker" },
+  { value: "BUSINESS", label: "Business / Entrepreneur" },
+  { value: "SENIOR_CITIZEN", label: "Senior Citizen" },
+  { value: "HOMEMAKER", label: "Homemaker" },
+  { value: "PWD", label: "Person with Disability" },
+  { value: "OTHER", label: "Other" },
+];
 
 function Row({ label, value }) {
   return (
@@ -50,13 +75,18 @@ function formatAnswer(value) {
 }
 
 function data(citizen) {
+  const { firstName, middleName, lastName } = splitFullName(citizen.full_name || "");
   return {
-    full_name: citizen.full_name || "",
+    // Split name fields — composed into full_name before API calls.
+    firstName,
+    middleName,
+    lastName,
     date_of_birth: citizen.date_of_birth || "",
     gender: citizen.gender || "",
     mobile_number: citizen.mobile_number || "",
     email_id: citizen.email_id || "",
     citizen_type: citizen.citizen_type || "GENERAL",
+    profile_types: citizen.profile_types || [],
     demographic: {
       disability_status: "NONE",
       ...(citizen.demographic || {}),
@@ -72,11 +102,11 @@ function data(citizen) {
   };
 }
 
-function Editor({ value, setValue, save, cancel, saving, error }) {
-  const root = (field, next) => setValue((current) => ({ ...current, [field]: next }));
+function Editor({ value, setValue, save, cancel, saving, error, fieldErrors, onFieldChange }) {
   const nested = (group, field, next) =>
     setValue((current) => ({ ...current, [group]: { ...current[group], [field]: next } }));
 
+  // Generic field renderer for profile sub-objects (no validation needed for these).
   const field = (group, key, label, type = "text") => (
     <Input
       id={`profile-${key}`}
@@ -90,29 +120,149 @@ function Editor({ value, setValue, save, cancel, saving, error }) {
     />
   );
 
+  // Derived age — display only.
+  const age = calculateAge(value.date_of_birth);
+
   return (
     <form onSubmit={save} noValidate className="space-y-7">
       {error && <ErrorState title="Unable to save profile" message={error} />}
       <section>
         <h2 className="text-xl mb-3">Personal</h2>
         <Card>
+          <div className="grid md:grid-cols-3 gap-x-5">
+            <Input
+              id="profile-first-name"
+              label="First name"
+              required
+              value={value.firstName}
+              error={fieldErrors?.firstName}
+              onChange={(e) => {
+                const v = e.target.value;
+                setValue((cur) => ({ ...cur, firstName: v }));
+                onFieldChange("firstName", validateFirstName, v);
+              }}
+              autoComplete="given-name"
+            />
+            <Input
+              id="profile-middle-name"
+              label="Middle name"
+              value={value.middleName}
+              error={fieldErrors?.middleName}
+              onChange={(e) => {
+                const v = e.target.value;
+                setValue((cur) => ({ ...cur, middleName: v }));
+                onFieldChange("middleName", validateMiddleName, v);
+              }}
+              autoComplete="additional-name"
+            />
+            <Input
+              id="profile-last-name"
+              label="Last name"
+              required
+              value={value.lastName}
+              error={fieldErrors?.lastName}
+              onChange={(e) => {
+                const v = e.target.value;
+                setValue((cur) => ({ ...cur, lastName: v }));
+                onFieldChange("lastName", validateLastName, v);
+              }}
+              autoComplete="family-name"
+            />
+          </div>
           <div className="grid md:grid-cols-2 gap-x-5">
-            <Input id="profile-name" label="Full name" required value={value.full_name} onChange={(e) => root("full_name", e.target.value)} />
-            <Input id="profile-dob" label="Date of birth" required type="date" value={value.date_of_birth} onChange={(e) => root("date_of_birth", e.target.value)} />
-            <Select id="profile-gender" label="Gender" value={value.gender} onChange={(e) => root("gender", e.target.value || null)}>
+            <div>
+              <Input
+                id="profile-dob"
+                label="Date of birth"
+                required
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={value.date_of_birth}
+                error={fieldErrors?.date_of_birth}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setValue((cur) => ({ ...cur, date_of_birth: v }));
+                  onFieldChange("date_of_birth", validateDob, v);
+                }}
+                autoComplete="bday"
+              />
+              {age !== null && !fieldErrors?.date_of_birth && (
+                <p className="text-xs text-ink-soft -mt-3 mb-5">
+                  Age: <strong>{age}</strong> years
+                </p>
+              )}
+            </div>
+            <Select
+              id="profile-gender"
+              label="Gender"
+              value={value.gender || ""}
+              onChange={(e) => setValue((cur) => ({ ...cur, gender: e.target.value || null }))}
+            >
               <option value="">Prefer not to say</option>
               <option value="MALE">Male</option>
               <option value="FEMALE">Female</option>
               <option value="OTHER">Other</option>
             </Select>
-            <Select id="profile-type" label="Citizen type" value={value.citizen_type} onChange={(e) => root("citizen_type", e.target.value)}>
+            <Select
+              id="profile-type"
+              label="Citizen type"
+              value={value.citizen_type}
+              onChange={(e) => setValue((cur) => ({ ...cur, citizen_type: e.target.value }))}
+            >
               <option value="GENERAL">General</option>
               <option value="FARMER">Farmer</option>
               <option value="STUDENT">Student</option>
               <option value="SENIOR">Senior</option>
             </Select>
-            <Input id="profile-mobile" label="Mobile number" value={value.mobile_number} onChange={(e) => root("mobile_number", e.target.value || null)} />
-            <Input id="profile-email" label="Email" type="email" value={value.email_id} onChange={(e) => root("email_id", e.target.value || null)} readOnly className="opacity-70" />
+            <div className="col-span-full md:col-span-3 mt-2">
+              <label className="block text-sm font-medium mb-2">Profile types (Select all that apply)</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {PROFILE_TYPE_OPTIONS.map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-accent-ink"
+                      checked={value.profile_types.includes(opt.value)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setValue((cur) => ({
+                          ...cur,
+                          profile_types: checked
+                            ? [...cur.profile_types, opt.value]
+                            : cur.profile_types.filter((t) => t !== opt.value)
+                        }));
+                      }}
+                    />
+                    <span className="text-sm">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Input
+              id="profile-mobile"
+              label="Mobile number"
+              required
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              value={value.mobile_number || ""}
+              error={fieldErrors?.mobile_number}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setValue((cur) => ({ ...cur, mobile_number: v || null }));
+                onFieldChange("mobile_number", validateMobile, v);
+              }}
+              autoComplete="tel"
+            />
+            <Input
+              id="profile-email"
+              label="Email"
+              type="email"
+              value={value.email_id || ""}
+              readOnly
+              className="opacity-70"
+              hint="Email cannot be changed here."
+            />
           </div>
         </Card>
       </section>
@@ -126,7 +276,20 @@ function Editor({ value, setValue, save, cancel, saving, error }) {
             {field("demographic", "marital_status", "Marital status")}
             {field("demographic", "social_category", "Social category")}
             {field("demographic", "disability_status", "Disability status")}
-            {field("financial", "annual_income", "Annual income", "number")}
+            <Input
+              id="profile-annual-income"
+              label="Annual income (₹)"
+              type="number"
+              min={0}
+              inputMode="numeric"
+              value={value.financial?.annual_income ?? ""}
+              error={fieldErrors?.annual_income}
+              onChange={(e) => {
+                const v = e.target.value;
+                nested("financial", "annual_income", v === "" ? null : Number(v));
+                onFieldChange("annual_income", validateIncome, v);
+              }}
+            />
             {field("financial", "employment_status", "Employment status")}
             {field("financial", "income_source", "Income source")}
             {field("financial", "poverty_category", "Poverty category")}
@@ -154,6 +317,8 @@ function Editor({ value, setValue, save, cancel, saving, error }) {
   );
 }
 
+
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [citizen, setCitizen] = useState(null);
@@ -162,6 +327,7 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [status, setStatus] = useState("loading");
   // Full submitted record from the eligibility form (every answer, not just
   // the fields with a canonical profile column).
@@ -209,17 +375,49 @@ export default function ProfilePage() {
     reloadProfile();
   }, [reloadProfile]);
 
+  // Live per-field validation callback (passed to Editor).
+  const onFieldChange = (field, validatorFn, value) => {
+    const err = validatorFn(value);
+    setFieldErrors((current) => ({ ...current, [field]: err }));
+  };
+
   const save = async (event) => {
     event.preventDefault();
-    if (!draft.full_name.trim() || !draft.date_of_birth) {
-      return setError("Full name and date of birth are required.");
+    // Run a full validation pass before sending to the API.
+    const errors = {
+      firstName: validateFirstName(draft.firstName),
+      middleName: validateMiddleName(draft.middleName),
+      lastName: validateLastName(draft.lastName),
+      mobile_number: validateMobile(draft.mobile_number),
+      date_of_birth: validateDob(draft.date_of_birth),
+      annual_income: validateIncome(draft.financial?.annual_income),
+    };
+    setFieldErrors(errors);
+    if (!hasNoErrors(errors)) {
+      setError("Please correct the highlighted fields before saving.");
+      return;
     }
     setSaving(true);
     setError("");
     try {
-      const response = await citizenService.update(citizenId, draft);
+      // Compose full_name from the three split name parts.
+      const full_name = buildFullName(draft.firstName, draft.middleName, draft.lastName);
+      const payload = {
+        full_name,
+        date_of_birth: draft.date_of_birth,
+        gender: draft.gender || null,
+        mobile_number: draft.mobile_number || null,
+        email_id: draft.email_id || null,
+        citizen_type: draft.citizen_type,
+        profile_types: draft.profile_types,
+        demographic: draft.demographic,
+        financial: draft.financial,
+        location: draft.location,
+      };
+      const response = await citizenService.update(citizenId, payload);
       setCitizen(response.data);
       setDraft(data(response.data));
+      setFieldErrors({});
       setEditing(false);
     } catch (requestError) {
       setError(
@@ -280,9 +478,11 @@ export default function ProfilePage() {
           value={draft}
           setValue={setDraft}
           save={save}
-          cancel={() => { setDraft(data(citizen)); setError(""); setEditing(false); }}
+          cancel={() => { setDraft(data(citizen)); setError(""); setFieldErrors({}); setEditing(false); }}
           saving={saving}
           error={error}
+          fieldErrors={fieldErrors}
+          onFieldChange={onFieldChange}
         />
       ) : (
         <div className="space-y-7">
@@ -327,6 +527,10 @@ export default function ProfilePage() {
             <Row label="Date of birth" value={citizen.date_of_birth} />
             <Row label="Gender" value={citizen.gender} />
             <Row label="Citizen type" value={citizen.citizen_type} />
+            <Row 
+              label="Profile types" 
+              value={citizen.profile_types?.map(t => PROFILE_TYPE_OPTIONS.find(o => o.value === t)?.label || t).join(", ")} 
+            />
           </Section>
           <Section title="Education / Employment">
             <Row label="Education level" value={d.education_level} />

@@ -8,6 +8,8 @@ require_admin so a citizen manually calling the API receives 403.
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +39,48 @@ async def get_authenticated_user(
         return await service.get_authenticated_user(token)
     except (UnauthorizedError, SessionExpiredError) as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+async def get_optional_user(
+    authorization: str | None = Header(None, description="Bearer token"),
+    db: AsyncSession = Depends(get_db),
+) -> UserAccount | None:
+    """Resolve the bearer token when one is present, else None (anonymous).
+
+    A present-but-invalid token still raises 401 — anonymous fallback is
+    never used to bypass a rejected credential.
+    """
+    if not authorization:
+        return None
+    return await get_authenticated_user(authorization=authorization, db=db)
+
+
+async def require_same_citizen(
+    user: UserAccount | None,
+    citizen_id: uuid.UUID,
+    db: AsyncSession,
+) -> None:
+    """Ownership guard for citizen-scoped endpoints that historically took a
+    client-supplied citizen_id (guest flow).
+
+    When the request is authenticated, the citizen_id must belong to the
+    authenticated user — otherwise another citizen's profile, submissions,
+    answers, or assessments could be read/written by anyone who obtains the
+    UUID. ADMINs bypass (they have the dedicated admin API). Anonymous
+    requests keep the legacy behavior so the pre-auth guest flow still works.
+    """
+    if user is None:
+        return
+    service = AuthService(db)
+    roles = await service.get_roles_for_user(user)
+    if "ADMIN" in roles:
+        return
+    citizen = await service.get_citizen_for_user(user)
+    if citizen is None or citizen.citizen_id != citizen_id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only access your own citizen profile",
+        )
 
 
 async def require_admin(

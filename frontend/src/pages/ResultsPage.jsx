@@ -6,7 +6,7 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/StatusStates";
 import RuleEvaluationDetails from "../components/eligibility/RuleEvaluationDetails";
-import { citizenService, recommendationService } from "../services/api";
+import { citizenService, eligibilityService, recommendationService } from "../services/api";
 import { categoryLabel } from "../utils/ruleFormat";
 
 function validRecommendations(value) {
@@ -36,15 +36,38 @@ export default function ResultsPage() {
   useEffect(() => {
     if (!citizenId) return;
 
-    recommendationService.getForCitizen(citizenId)
+    // ALWAYS re-evaluate before showing stored results: the scheme catalogue
+    // grows (admins add schemes) and stored assessments go stale. Re-running
+    // the engine here guarantees the evaluated count equals the current
+    // active scheme count and the eligible/not-eligible split reflects the
+    // latest rules — consistent with Home, Schemes, and the Admin console.
+    let cancelled = false;
+
+    citizenService.get(citizenId)
+      .then((response) => setCitizen(response.data))
+      .catch(() => setCitizen(null));
+
+    eligibilityService.evaluate(citizenId)
+      .catch((error) => {
+        // A failed evaluation must not block showing previously stored
+        // results — but a 404 means the citizen itself is gone.
+        if (error?.response?.status === 404) {
+          setStatus("not-found");
+          throw { handled: true };
+        }
+        return null; // tolerate: fall through to stored recommendations
+      })
+      .then(() => (cancelled ? null : recommendationService.getForCitizen(citizenId)))
       .then((response) => {
-        if (!validRecommendations(response.data)) {
+        if (cancelled) return;
+        if (!validRecommendations(response?.data)) {
           throw new Error("Malformed recommendations response");
         }
         setData(response.data);
         setStatus("ready");
       })
       .catch((error) => {
+        if (cancelled || error?.handled) return;
         const apiStatus = error?.response?.status;
         if (apiStatus === 404) {
           setStatus("not-found");
@@ -53,9 +76,9 @@ export default function ResultsPage() {
         }
       });
 
-    citizenService.get(citizenId)
-      .then((response) => setCitizen(response.data))
-      .catch(() => setCitizen(null));
+    return () => {
+      cancelled = true;
+    };
   }, [citizenId, reloadKey]);
 
   if (!citizenId) return <ErrorState title="Missing citizen ID" message="We need a citizen profile ID to load eligibility results." />;

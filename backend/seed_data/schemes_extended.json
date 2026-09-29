@@ -1,0 +1,818 @@
+{
+  "schemes": [
+    {
+      "scheme_name": "Post-Matric Scholarship to OBC Students - Maharashtra",
+      "department_name": "Department of Other Backward Bahujan Welfare, Government of Maharashtra",
+      "scheme_category": "EDUCATION",
+      "description": "Post-matric financial assistance to OBC students of Maharashtra pursuing government-approved education beyond Class X, administered through MahaDBT.",
+      "benefit_description": "Maintenance allowance and reimbursement of compulsory fees as per state norms for post-matric courses.",
+      "status": "ACTIVE",
+      "official_source_url": "https://mahadbt.maharashtra.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category & Domicile",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "OBC",
+              "rule_description": "Applicant must belong to the OBC category",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an OBC caste certificate from the Tahsildar office."
+            },
+            {
+              "parameter_name": "state",
+              "operator": "==",
+              "required_value": "Maharashtra",
+              "rule_description": "Applicant must be a Maharashtra resident",
+              "rule_priority": 2,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "Obtain a Maharashtra domicile certificate; this state scheme is residency-restricted."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing post-matric (Class X and above) education",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship covers education beyond matriculation only."
+            }
+          ]
+        },
+        {
+          "group_name": "Financial Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "is_income_tax_payer",
+              "operator": "==",
+              "required_value": "false",
+              "rule_description": "Parents/guardians must not be income-tax payers per state income limit",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Provide a valid income certificate within the state limit."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "CASTE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "DOMICILE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Tuition Fee & Exam Fee Reimbursement for OBC Girls in Professional Courses - Maharashtra",
+      "department_name": "Department of Other Backward Bahujan Welfare, Government of Maharashtra",
+      "scheme_category": "EDUCATION",
+      "description": "Full tuition and examination fee reimbursement for OBC girl students pursuing professional courses in government-approved institutions in Maharashtra.",
+      "benefit_description": "100% reimbursement of tuition fees and examination fees for eligible professional courses.",
+      "status": "ACTIVE",
+      "official_source_url": "https://mahadbt.maharashtra.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category, Gender & Domicile",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "OBC",
+              "rule_description": "Applicant must belong to the OBC category",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an OBC caste certificate from the Tahsildar office."
+            },
+            {
+              "parameter_name": "gender",
+              "operator": "==",
+              "required_value": "FEMALE",
+              "rule_description": "Scheme is exclusively for girl students",
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This fee-reimbursement scheme is only for female OBC students."
+            },
+            {
+              "parameter_name": "state",
+              "operator": "==",
+              "required_value": "Maharashtra",
+              "rule_description": "Applicant must be a Maharashtra resident",
+              "rule_priority": 3,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "Obtain a Maharashtra domicile certificate."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "==",
+              "required_value": "GRADUATE",
+              "rule_description": "Must be enrolled in a professional degree course",
+              "rule_priority": 4,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scheme covers professional degree-level courses."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "CASTE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Rajarshi Chhatrapati Shahu Maharaj Shikshan Shulkh Shishyavrutti (EWS/EBC) - Maharashtra",
+      "department_name": "Department of Social Justice and Special Assistance, Government of Maharashtra",
+      "scheme_category": "EDUCATION",
+      "description": "Fee reimbursement and scholarship for economically backward general-category (SEBC/EWS) students of Maharashtra admitted to eligible professional and non-professional courses.",
+      "benefit_description": "Tuition-fee reimbursement up to state norms for eligible general-category students with family income up to Rs 8 lakh.",
+      "status": "ACTIVE",
+      "official_source_url": "https://mahadbt.maharashtra.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category & Domicile",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "GEN",
+              "rule_description": "Targets the general (open/SEBC) category - reserved-category students have their own dedicated schemes",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Reserved-category students should apply under their category's post-matric scholarship."
+            },
+            {
+              "parameter_name": "state",
+              "operator": "==",
+              "required_value": "Maharashtra",
+              "rule_description": "Applicant must be a Maharashtra resident",
+              "rule_priority": 2,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "Obtain a Maharashtra domicile certificate."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing eligible higher/professional education",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scheme covers eligible professional and non-professional courses."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "800000",
+              "rule_description": "Family annual income must be Rs 8,00,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an income certificate confirming family income within Rs 8 lakh."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "DOMICILE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Top Class Education for SC Students",
+      "department_name": "Ministry of Social Justice and Empowerment, Government of India",
+      "scheme_category": "EDUCATION",
+      "description": "Central Sector Scholarship enabling SC students to pursue education beyond Class XII in notified premier institutions across India.",
+      "benefit_description": "Full tuition fee support, living expenses and book/grant allowance at notified institutions.",
+      "status": "ACTIVE",
+      "official_source_url": "https://socialjustice.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "SC",
+              "rule_description": "Applicant must belong to the SC category",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an SC caste certificate from the competent authority."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing education beyond Class XII at a notified institution",
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Admission to a notified premier institution is required (engineering is covered)."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "800000",
+              "rule_description": "Family annual income must not exceed Rs 8 lakh (scheme ceiling)",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Provide an income certificate within the notified ceiling."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "CASTE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Top Class Education for ST Students",
+      "department_name": "Ministry of Tribal Affairs, Government of India",
+      "scheme_category": "EDUCATION",
+      "description": "National fellowship-style scholarship enabling ST students to pursue higher education at identified premier institutions such as IITs and NITs.",
+      "benefit_description": "Full tuition support at identified premier institutes plus monthly living allowance and book grants.",
+      "status": "ACTIVE",
+      "official_source_url": "https://tribal.nic.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "ST",
+              "rule_description": "Applicant must belong to the ST category",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an ST caste/tribe certificate from the competent authority."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing prescribed higher-education courses at identified premier institutes",
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Admission to an identified premier institute (IIT/NIT and similar) is required."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "600000",
+              "rule_description": "Family annual income must be Rs 6,00,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Provide an income certificate within the Rs 6 lakh ceiling."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "CASTE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Post-Matric Scholarship to ST Students - Maharashtra",
+      "department_name": "Tribal Development Department, Government of Maharashtra",
+      "scheme_category": "EDUCATION",
+      "description": "Post-matric financial assistance to ST students of Maharashtra pursuing approved courses, with income ceiling of Rs 2.5 lakh.",
+      "benefit_description": "Maintenance allowance and fee reimbursement as per state norms; caste validity required for professional courses.",
+      "status": "ACTIVE",
+      "official_source_url": "https://mahadbt.maharashtra.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category, Domicile & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "ST",
+              "rule_description": "Applicant must belong to the ST category",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an ST caste certificate from the Tahsildar office."
+            },
+            {
+              "parameter_name": "state",
+              "operator": "==",
+              "required_value": "Maharashtra",
+              "rule_description": "Applicant must be a Maharashtra resident",
+              "rule_priority": 2,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "Obtain a Maharashtra domicile certificate."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
+              "rule_description": "Minimum matriculation passed; must be pursuing post-matric education",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scholarship applies to education beyond matriculation."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "250000",
+              "rule_description": "Family annual income must be Rs 2,50,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an income certificate confirming family income within Rs 2.5 lakh."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "CASTE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "DOMICILE_CERTIFICATE", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Post-Matric Scholarship to VJNT Students - Maharashtra",
+      "department_name": "Department of VJNT, SBC and Special Welfare, Government of Maharashtra",
+      "scheme_category": "EDUCATION",
+      "description": "Post-matric financial assistance to Vimukta Jati and Nomadic Tribes (VJNT) students of Maharashtra pursuing approved courses.",
+      "benefit_description": "Maintenance allowance and fee reimbursement as per state norms for eligible VJNT students.",
+      "status": "ACTIVE",
+      "official_source_url": "https://mahadbt.maharashtra.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category, Domicile & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "VJNT",
+              "rule_description": "Applicant must belong to a Vimukta Jati / Nomadic Tribe",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain a VJNT caste certificate from the Tahsildar office."
+            },
+            {
+              "parameter_name": "state",
+              "operator": "==",
+              "required_value": "Maharashtra",
+              "rule_description": "Applicant must be a Maharashtra resident",
+              "rule_priority": 2,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "Obtain a Maharashtra domicile certificate."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing a post-matric approved course",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scholarship applies to approved post-matric courses."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "250000",
+              "rule_description": "Family annual income must be Rs 2,50,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an income certificate confirming family income within Rs 2.5 lakh."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "CASTE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "DOMICILE_CERTIFICATE", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Post-Matric Scholarship to SBC Students - Maharashtra",
+      "department_name": "Department of VJNT, SBC and Special Welfare, Government of Maharashtra",
+      "scheme_category": "EDUCATION",
+      "description": "Post-matric financial assistance to Special Backward Class (SBC) students of Maharashtra pursuing approved courses, with attendance requirements.",
+      "benefit_description": "Maintenance allowance and fee reimbursement as per state norms; 75% attendance required.",
+      "status": "ACTIVE",
+      "official_source_url": "https://mahadbt.maharashtra.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Category, Domicile & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "==",
+              "required_value": "SBC",
+              "rule_description": "Applicant must belong to the Special Backward Class",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an SBC caste certificate from the Tahsildar office."
+            },
+            {
+              "parameter_name": "state",
+              "operator": "==",
+              "required_value": "Maharashtra",
+              "rule_description": "Applicant must be a Maharashtra resident",
+              "rule_priority": 2,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "Obtain a Maharashtra domicile certificate."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing a post-matric approved course",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scholarship applies to approved post-matric courses."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "250000",
+              "rule_description": "Family annual income must be Rs 2,50,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an income certificate confirming family income within Rs 2.5 lakh."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "CASTE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "DOMICILE_CERTIFICATE", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Merit-cum-Means Scholarship for Professional and Technical Courses (Minority Students)",
+      "department_name": "Ministry of Minority Affairs, Government of India",
+      "scheme_category": "EDUCATION",
+      "description": "Scholarship for students from notified minority communities pursuing professional and technical undergraduate and postgraduate courses, including B.E./B.Tech engineering disciplines.",
+      "benefit_description": "Course-fee support and monthly maintenance allowance for eligible minority students in professional/technical courses.",
+      "status": "ACTIVE",
+      "official_source_url": "https://minorityaffairs.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Community & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "social_category",
+              "operator": "IN",
+              "required_value": "MINORITY,MUSLIM,CHRISTIAN,SIKH,BUDDHIST,PARSI,JAIN",
+              "rule_description": "Applicant must belong to a notified minority community",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain a minority-community declaration/certificate as applicable."
+            },
+            {
+              "parameter_name": "twelfth_percentage",
+              "operator": ">=",
+              "required_value": "50",
+              "rule_description": "Must have scored at least 50% in the previous final examination (12th standard)",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The merit-cum-means scholarship requires 50% or more marks in the previous qualifying examination."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing a professional or technical course at eligible institutions",
+              "rule_priority": 4,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scholarship covers professional/technical UG-PG courses (B.E./B.Tech included)."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "250000",
+              "rule_description": "Family annual income must be Rs 2,50,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an income certificate confirming family income within Rs 2.5 lakh."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": true },
+        { "document_type": "BANK_PASSBOOK", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "PM-USP Central Sector Scholarship for College and University Students",
+      "department_name": "Ministry of Education, Government of India",
+      "scheme_category": "EDUCATION",
+      "description": "Central Sector merit scholarship for students above the 80th percentile in Class XII pursuing regular degree courses, with family income up to Rs 4.5 lakh.",
+      "benefit_description": "Fixed monthly scholarship amount paid for the duration of the regular degree course.",
+      "status": "ACTIVE",
+      "official_source_url": "https://www.education.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Merit & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "twelfth_percentile",
+              "operator": ">=",
+              "required_value": "80",
+              "rule_description": "Must be above the 80th percentile of successful candidates in the Class XII stream/board",
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "PM-USP requires above the 80th percentile in Class XII; check your board percentile."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "==",
+              "required_value": "GRADUATE",
+              "rule_description": "Must be pursuing a regular degree course (diploma-only students are not eligible)",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scholarship applies to regular degree courses after Class XII."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "450000",
+              "rule_description": "Family annual income must be Rs 4,50,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an income certificate confirming family income within Rs 4.5 lakh."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": true },
+        { "document_type": "BANK_PASSBOOK", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "AICTE Pragati Scholarship for Girl Students",
+      "department_name": "All India Council for Technical Education",
+      "scheme_category": "EDUCATION",
+      "description": "AICTE scholarship for girl students in the first year of a degree or diploma at AICTE-approved institutions, with family income up to Rs 8 lakh (two girls per family).",
+      "benefit_description": "Rs 50,000 per annum for tuition and contingency support, selected on qualifying-examination merit.",
+      "status": "ACTIVE",
+      "official_source_url": "https://aicte-india.org",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Gender & Technical Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "gender",
+              "operator": "==",
+              "required_value": "FEMALE",
+              "rule_description": "Scheme is exclusively for girl students",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Pragati is only for female students in technical education."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "==",
+              "required_value": "GRADUATE",
+              "rule_description": "Must be in the first year of an AICTE-approved degree/diploma",
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Admission through a centralized process to an AICTE-approved institution is required."
+            }
+          ]
+        },
+        {
+          "group_name": "Economic Criteria",
+          "intra_group_operator": "AND",
+          "group_priority": 2,
+          "rules": [
+            {
+              "parameter_name": "annual_income",
+              "operator": "<=",
+              "required_value": "800000",
+              "rule_description": "Family annual income must be Rs 8,00,000 or below",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Obtain an income certificate confirming family income within Rs 8 lakh."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": true },
+        { "document_type": "BANK_PASSBOOK", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "AICTE Saksham Scholarship for Differently-Abled Students",
+      "department_name": "All India Council for Technical Education",
+      "scheme_category": "EDUCATION",
+      "description": "AICTE scholarship for differently-abled students pursuing degree or diploma courses at AICTE-approved institutions.",
+      "benefit_description": "Rs 50,000 per annum covering tuition and contingency support for eligible differently-abled technical students.",
+      "status": "ACTIVE",
+      "official_source_url": "https://aicte-india.org",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Disability & Technical Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "disability_status",
+              "operator": "!=",
+              "required_value": "NONE",
+              "rule_description": "Applicant must have a documented disability (disability certificate, 40% or above)",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "A disability certificate from a competent medical authority is required."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "==",
+              "required_value": "GRADUATE",
+              "rule_description": "Must be pursuing a degree or diploma at an AICTE-approved institution",
+              "rule_priority": 2,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "Enrollment at an AICTE-approved technical institution is required."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "DISABILITY_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "AADHAAR", "mandatory_flag": true },
+        { "document_type": "BANK_PASSBOOK", "mandatory_flag": false }
+      ]
+    },
+    {
+      "scheme_name": "Post-Matric Scholarship for Persons with Disabilities - Maharashtra",
+      "department_name": "Department of Social Justice and Special Assistance, Government of Maharashtra",
+      "scheme_category": "EDUCATION",
+      "description": "Post-matric financial assistance to students with 40% or more disability in Maharashtra pursuing education at recognized institutions.",
+      "benefit_description": "Maintenance allowance and fee reimbursement as per state norms for eligible students with disabilities.",
+      "status": "ACTIVE",
+      "official_source_url": "https://mahadbt.maharashtra.gov.in",
+      "group_combining_operator": "AND",
+      "target_persona": "STUDENT",
+      "rule_groups": [
+        {
+          "group_name": "Disability, Domicile & Education",
+          "intra_group_operator": "AND",
+          "group_priority": 1,
+          "rules": [
+            {
+              "parameter_name": "disability_status",
+              "operator": "!=",
+              "required_value": "NONE",
+              "rule_description": "Applicant must have a disability of 40% or above (disability certificate required)",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "A disability certificate showing 40% or more disability is required."
+            },
+            {
+              "parameter_name": "state",
+              "operator": "==",
+              "required_value": "Maharashtra",
+              "rule_description": "Applicant must be a Maharashtra resident",
+              "rule_priority": 2,
+              "failure_stage_code": "S2_DOMICILE_MISMATCH",
+              "remedy_template": "Obtain a Maharashtra domicile certificate."
+            },
+            {
+              "parameter_name": "education_level",
+              "operator": "IN",
+              "required_value": "HIGHER_SECONDARY,GRADUATE,POST_GRADUATE",
+              "rule_description": "Must be pursuing post-matric education at a recognized institution",
+              "rule_priority": 3,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "The scholarship applies to post-matric courses at recognized institutions."
+            }
+          ]
+        }
+      ],
+      "documents": [
+        { "document_type": "DISABILITY_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "DOMICILE_CERTIFICATE", "mandatory_flag": true },
+        { "document_type": "MARKSHEET", "mandatory_flag": true },
+        { "document_type": "INCOME_CERTIFICATE", "mandatory_flag": false }
+      ]
+    }
+  ]
+}

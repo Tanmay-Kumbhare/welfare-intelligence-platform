@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.deps import get_optional_user, require_same_citizen
 from app.database import get_db
 from app.schemas.citizen import (
     CitizenCreate,
@@ -29,12 +30,15 @@ async def register_citizen(
 @router.get("/{citizen_id}", response_model=CitizenResponse)
 async def get_citizen(
     citizen_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
 ) -> Any:
     service = CitizenService(db)
     citizen = await service.get_citizen(citizen_id)
     if not citizen:
         raise HTTPException(status_code=404, detail="Citizen not found")
+    # Authenticated callers may only read their own profile (admins excepted).
+    await require_same_citizen(user, citizen_id, db)
     return citizen
 
 
@@ -43,7 +47,10 @@ async def update_citizen(
     citizen_id: uuid.UUID,
     data: CitizenUpdate,
     db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
 ) -> Any:
+    # Ownership first: an authenticated user must not edit another citizen.
+    await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)
     citizen = await service.update_citizen(citizen_id, data)
     if not citizen:

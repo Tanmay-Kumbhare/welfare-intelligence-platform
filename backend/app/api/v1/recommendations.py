@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.deps import get_optional_user, require_same_citizen
 from app.database import get_db
 from app.repositories.assessment_repository import AssessmentRepository
 from app.repositories.citizen_repository import CitizenRepository
@@ -15,12 +16,15 @@ router = APIRouter()
 @router.get("/{citizen_id}", response_model=RecommendationsResponse)
 async def get_citizen_recommendations(
     citizen_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
 ) -> Any:
     """
     Returns the previously stored eligibility assessments formatted as recommendations.
     Call POST /eligibility/evaluate/{citizen_id} first to generate these.
     """
+    # Authenticated callers may only read their own recommendations.
+    await require_same_citizen(user, citizen_id, db)
     citizen_repo = CitizenRepository(db)
     citizen = await citizen_repo.get_by_id(citizen_id)
     if not citizen:

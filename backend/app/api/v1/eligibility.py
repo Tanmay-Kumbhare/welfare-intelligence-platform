@@ -4,6 +4,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.deps import get_optional_user, require_same_citizen
 from app.database import get_db
 from app.repositories.assessment_repository import AssessmentRepository
 from app.repositories.citizen_repository import CitizenRepository
@@ -17,12 +18,15 @@ router = APIRouter()
 @router.post("/evaluate/{citizen_id}", response_model=List[AssessmentResponse])
 async def evaluate_citizen_eligibility(
     citizen_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
 ) -> Any:
     """
     Evaluates the citizen against ALL active schemes and stores the assessments.
     Returns the updated list of assessments.
     """
+    # Authenticated callers may only evaluate their own profile.
+    await require_same_citizen(user, citizen_id, db)
     citizen_repo = CitizenRepository(db)
     scheme_repo = SchemeRepository(db)
     assessment_repo = AssessmentRepository(db)

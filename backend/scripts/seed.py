@@ -29,13 +29,23 @@ async def seed_data():
     engine = create_async_engine(settings.DATABASE_URL)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
 
-    seed_file = Path(__file__).parent.parent / "seed_data" / "schemes.json"
-    if not seed_file.exists():
-        logger.error(f"Seed file not found at {seed_file}")
+    seed_files = [
+        Path(__file__).parent.parent / "seed_data" / "schemes.json",
+        Path(__file__).parent.parent / "seed_data" / "schemes_extended.json",
+    ]
+    schemes_payload = {"schemes": []}
+    loaded_any = False
+    for seed_file in seed_files:
+        if not seed_file.exists():
+            logger.warning(f"Seed file not found, skipping: {seed_file}")
+            continue
+        with open(seed_file, "r", encoding="utf-8-sig") as f:
+            schemes_payload["schemes"].extend(json.load(f)["schemes"])
+        loaded_any = True
+    if not loaded_any:
+        logger.error("No seed files found")
         return
-
-    with open(seed_file, "r", encoding="utf-8-sig") as f:
-        data = json.load(f)
+    data = schemes_payload
 
     async with async_session() as session:
         # Idempotent seeding: skip schemes that already exist by name so a

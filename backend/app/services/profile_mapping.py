@@ -355,6 +355,35 @@ REGISTRY: dict[str, ProfileField] = {
         domain="education", column="scholarship_currently_received",
         data_type="BOOLEAN", fact_code="SCHOLARSHIP_STATUS",
         bare_names=("scholarship_currently_received", "receiving_scholarship")),
+    # ------------------------------------------------------------------
+    # Academic-record facts (fact-only: education schemes gate on exact
+    # 10th/12th marks and board percentile; stored as facts so the
+    # eligibility engine can evaluate '>= 50%' / '80th percentile' rules).
+    # ------------------------------------------------------------------
+    "education.tenth_percentage": _pf(
+        domain="education", column=None, data_type="DECIMAL",
+        fact_code="TENTH_PERCENTAGE", fact_only=True,
+        bare_names=("tenth_percentage", "tenth_marks", "ssc_percentage")),
+    "education.twelfth_percentage": _pf(
+        domain="education", column=None, data_type="DECIMAL",
+        fact_code="TWELFTH_PERCENTAGE", fact_only=True,
+        bare_names=("twelfth_percentage", "twelfth_marks", "hsc_percentage")),
+    "education.twelfth_percentile": _pf(
+        domain="education", column=None, data_type="DECIMAL",
+        fact_code="TWELFTH_PERCENTILE", fact_only=True,
+        bare_names=("twelfth_percentile", "hsc_percentile")),
+    # ------------------------------------------------------------------
+    # Livestock detail (fact-only: farmer-welfare schemes evaluate counts,
+    # not just the OWNS_LIVESTOCK yes/no flag).
+    # ------------------------------------------------------------------
+    "asset.livestock_cattle_count": _pf(
+        domain="asset", column=None, data_type="INTEGER",
+        fact_code="LIVESTOCK_CATTLE_COUNT", fact_only=True,
+        bare_names=("livestock_cattle_count", "cattle_count")),
+    "asset.livestock_poultry_count": _pf(
+        domain="asset", column=None, data_type="INTEGER",
+        fact_code="LIVESTOCK_POULTRY_COUNT", fact_only=True,
+        bare_names=("livestock_poultry_count", "poultry_count")),
 }
 
 # Fields whose value must NEVER be asked directly: normalization derives

@@ -23,6 +23,10 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        # backend/.env carries keys for adjacent subsystems (supabase, redis,
+        # llm routing) that Settings itself does not declare — ignore them
+        # instead of failing startup with extra_forbidden errors.
+        extra="ignore",
     )
 
     # ------------------------------------------------------------------

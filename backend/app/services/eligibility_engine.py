@@ -80,6 +80,14 @@ class EligibilityEngine:
 
         return overall_result, evaluation_details, reason
 
+    def _fact_value(self, citizen: CitizenMaster, fact_code: str) -> str | None:
+        """Open profile-fact value for a code (fact layer = canonical store
+        the normalization pipeline writes). None when never answered."""
+        for fact in (getattr(citizen, "profile_facts", None) or []):
+            if fact.fact_code == fact_code and fact.effective_until is None:
+                return fact.fact_value
+        return None
+
     def _resolve_parameter(self, citizen: CitizenMaster, parameter_name: str) -> Any:
         """Map parameter names to actual DB column values."""
         if parameter_name == "age":
@@ -121,23 +129,69 @@ class EligibilityEngine:
             return citizen.financial_profile.is_income_tax_payer if citizen.financial_profile else False
             
         elif parameter_name == "employment_status":
+            # Fact layer first (the canonical post-normalization store the
+            # registry writes), then the legacy V1 financial-profile column.
+            fact_value = self._fact_value(citizen, "EMPLOYMENT_STATUS")
+            if fact_value is not None:
+                return fact_value
             return citizen.financial_profile.employment_status if citizen.financial_profile else None
             
         elif parameter_name == "social_category":
             return citizen.demographic_profile.social_category if citizen.demographic_profile else None
             
         elif parameter_name == "education_level":
+            # Fact layer first: the v3 form writes education answers to the
+            # EDUCATION_LEVEL fact; the old demographic_profile.education_level
+            # column is empty for citizens who only used the form.
+            fact_value = self._fact_value(citizen, "EDUCATION_LEVEL")
+            if fact_value is not None:
+                return fact_value
             return citizen.demographic_profile.education_level if citizen.demographic_profile else None
             
         elif parameter_name == "disability_status":
+            # Fact layer first. The v3 form's HAS_DISABILITY answer stores
+            # YES/NO/PENDING; map deterministically to the canonical values
+            # scheme rules compare against (NONE = no disability).
+            fact_value = self._fact_value(citizen, "DISABILITY_STATUS")
+            if fact_value == "YES":
+                return "PHYSICALLY_DISABLED"
+            if fact_value == "NO":
+                return "NONE"
+            if fact_value == "PENDING":
+                return "PENDING"
             return citizen.demographic_profile.disability_status if citizen.demographic_profile else "NONE"
             
         elif parameter_name == "area_type":
             return citizen.location_profile.area_type if citizen.location_profile else None
-            
+
         elif parameter_name == "state":
             return citizen.location_profile.state if citizen.location_profile else None
-            
+
+        # ------------------------------------------------------------------
+        # Academic-record parameters (read from the open profile-fact layer;
+        # facts are the canonical store for exact 10th/12th marks and
+        # percentile. Additive branch — existing parameter logic unchanged.
+        # ------------------------------------------------------------------
+        elif parameter_name in (
+            "tenth_percentage", "twelfth_percentage", "twelfth_percentile",
+            "livestock_cattle_count", "livestock_poultry_count",
+        ):
+            fact_code_map = {
+                "tenth_percentage": "TENTH_PERCENTAGE",
+                "twelfth_percentage": "TWELFTH_PERCENTAGE",
+                "twelfth_percentile": "TWELFTH_PERCENTILE",
+                "livestock_cattle_count": "LIVESTOCK_CATTLE_COUNT",
+                "livestock_poultry_count": "LIVESTOCK_POULTRY_COUNT",
+            }
+            wanted = fact_code_map[parameter_name]
+            for fact in (getattr(citizen, "profile_facts", None) or []):
+                if fact.fact_code == wanted and fact.effective_until is None:
+                    try:
+                        return float(fact.fact_value)
+                    except (TypeError, ValueError):
+                        break
+            return None  # never answered — rule fails with "not provided"
+
         else:
             logger.warning(f"Unknown parameter_name: {parameter_name}")
             return None

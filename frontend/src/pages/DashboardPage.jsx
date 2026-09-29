@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { User, FileText, CheckCircle, Clock, AlertCircle, Search, Settings } from "lucide-react";
+import { User, FileText, CheckCircle, Clock, AlertCircle, Search, Settings, XCircle } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";

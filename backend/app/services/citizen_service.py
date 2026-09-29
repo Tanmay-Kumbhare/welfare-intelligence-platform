@@ -1,4 +1,4 @@
-﻿"""
+"""
 Citizen service — orchestrates citizen domain operations.
 """
 
@@ -32,6 +32,7 @@ def _to_response(citizen: CitizenMaster) -> CitizenResponse:
         mobile_number=citizen.mobile_number,
         email_id=citizen.email_id,
         citizen_type=citizen.citizen_type,
+        profile_types=citizen.profile_types or [],
         registration_date=citizen.registration_date,
         verification_status=citizen.verification_status,
         demographic=(

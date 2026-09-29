@@ -69,6 +69,7 @@ class DocumentClassifier:
             
         text_to_search = (filename + " " + snippet).lower()
         
+        import re
         if "10th" in text_to_search or "secondary" in text_to_search or "ssc" in text_to_search:
             return "10TH_MARKSHEET"
         if "12th" in text_to_search or "hsc" in text_to_search or "higher secondary" in text_to_search:
@@ -83,7 +84,7 @@ class DocumentClassifier:
             return "CASTE_CERTIFICATE"
         if "domicile" in text_to_search or "address" in text_to_search:
             return "ADDRESS_PROOF"
-        if "aadhaar" in text_to_search or "identity" in text_to_search or "pan" in text_to_search:
+        if "aadhaar" in text_to_search or "identity" in text_to_search or re.search(r'\bpan\b', text_to_search):
             return "IDENTITY_PROOF"
         if "disability" in text_to_search or "handicap" in text_to_search:
             return "DISABILITY_CERTIFICATE"
@@ -93,7 +94,7 @@ class DocumentClassifier:
             return "BANK_PROOF"
         if "udyam" in text_to_search or "business" in text_to_search:
             return "UDYAM_REGISTRATION"
-        if "age" in text_to_search or "birth" in text_to_search:
+        if re.search(r'\bage\b', text_to_search) or "birth" in text_to_search or re.search(r'\bdob\b', text_to_search):
             return "AGE_PROOF"
         if "farmer" in text_to_search:
             return "FARMER_DOCUMENT"

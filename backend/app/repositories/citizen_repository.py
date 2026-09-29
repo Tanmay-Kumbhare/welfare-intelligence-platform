@@ -1,4 +1,4 @@
-﻿"""
+"""
 Citizen repository — async SQLAlchemy queries for citizen domain tables.
 No business logic here; only data access.
 """
@@ -11,6 +11,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.citizen import CitizenMaster, DemographicProfile, FinancialProfile, LocationProfile
 from app.schemas.citizen import CitizenCreate, CitizenUpdate
@@ -29,6 +30,7 @@ class CitizenRepository:
             mobile_number=data.mobile_number,
             email_id=data.email_id,
             citizen_type=data.citizen_type,
+            profile_types=data.profile_types,
         )
         self.db.add(citizen)
         await self.db.flush()  # Get citizen_id without committing
@@ -64,6 +66,7 @@ class CitizenRepository:
             mobile_number=payload.mobile_number,
             email_id=payload.email_id,
             citizen_type=payload.citizen_type,
+            profile_types=payload.profile_types,
             owning_user_id=user_id,
         )
         self.db.add(citizen)
@@ -128,11 +131,14 @@ class CitizenRepository:
         citizen = await self.get_by_id(citizen_id)
         if citizen is None:
             return None
+        print("DEBUG REPO UPDATE PAYLOAD:", data.profile_types)
         for field in (
             "full_name", "date_of_birth", "gender", "mobile_number",
-            "email_id", "citizen_type",
+            "email_id", "citizen_type", "profile_types",
         ):
             setattr(citizen, field, getattr(data, field))
+        flag_modified(citizen, "profile_types")
+        print("DEBUG REPO UPDATE CITIZEN:", citizen.profile_types)
         for profile, values in (
             (citizen.demographic_profile, data.demographic.model_dump()),
             (citizen.financial_profile, data.financial.model_dump()),
@@ -157,11 +163,14 @@ class CitizenRepository:
         if citizen is None:
             return None
         payload = CitizenUpdate.model_validate(data)
+        print("DEBUG REPO PAYLOAD:", payload.profile_types)
         for field in (
             "full_name", "date_of_birth", "gender", "mobile_number",
-            "email_id", "citizen_type",
+            "email_id", "citizen_type", "profile_types",
         ):
             setattr(citizen, field, getattr(payload, field))
+        flag_modified(citizen, "profile_types")
+        print("DEBUG REPO CITIZEN:", citizen.profile_types)
         for profile, values in (
             (citizen.demographic_profile, payload.demographic.model_dump()),
             (citizen.financial_profile, payload.financial.model_dump()),

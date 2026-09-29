@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -49,6 +49,7 @@ async def update_citizen(
     db: AsyncSession = Depends(get_db),
     user: Any = Depends(get_optional_user),
 ) -> Any:
+    print("DEBUG PAYLOAD:", data.profile_types)
     # Ownership first: an authenticated user must not edit another citizen.
     await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)

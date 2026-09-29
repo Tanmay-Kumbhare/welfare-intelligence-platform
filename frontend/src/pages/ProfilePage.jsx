@@ -5,9 +5,11 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/StatusStates";
-import { authService, citizenService } from "../services/api";
+import { authService, citizenService, formService } from "../services/api";
 import { getUser, clearAuth } from "../services/auth";
 import { extractApiErrorMessage } from "../utils/apiError";
+
+const FORM_CODE = "GENERAL_CITIZEN_PROFILE";
 
 function Row({ label, value }) {
   return (
@@ -29,6 +31,22 @@ function Section({ title, children }) {
       </Card>
     </section>
   );
+}
+
+function formatAnswer(value) {
+  if (value === null || value === undefined || value === "") return "Not provided";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) {
+    return value
+      .map((item) =>
+        typeof item === "object" && item !== null
+          ? [item.name, item.relationship].filter(Boolean).join(" · ") || "Family member"
+          : String(item)
+      )
+      .join(", ");
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }
 
 function data(citizen) {
@@ -145,6 +163,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("loading");
+  // Full submitted record from the eligibility form (every answer, not just
+  // the fields with a canonical profile column).
+  const [savedAnswers, setSavedAnswers] = useState(null);
+  const [formSections, setFormSections] = useState(null);
 
   const reloadProfile = useCallback(async () => {
     try {
@@ -159,6 +181,19 @@ export default function ProfilePage() {
       setCitizen(response.data);
       setDraft(data(response.data));
       setStatus("ready");
+      // Load the full submitted record in the background — display-only,
+      // failures here never block the profile page.
+      try {
+        const [savedResp, formResp] = await Promise.all([
+          formService.getSavedAnswers(FORM_CODE),
+          formService.getActive(FORM_CODE),
+        ]);
+        setSavedAnswers(savedResp.data?.values || null);
+        setFormSections(formResp.data?.sections || null);
+      } catch {
+        setSavedAnswers(null);
+        setFormSections(null);
+      }
     } catch (requestError) {
       const code = requestError?.response?.status;
       if (code === 401) {
@@ -251,6 +286,42 @@ export default function ProfilePage() {
         />
       ) : (
         <div className="space-y-7">
+          {savedAnswers && formSections && formSections.length > 0 && (
+            <section>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <h2 className="text-xl mb-0">Your eligibility form answers</h2>
+                <Button to="/check-eligibility?edit=1" size="sm" variant="secondary">
+                  Review &amp; edit answers
+                </Button>
+              </div>
+              <p className="text-sm text-ink-soft mb-3 max-w-[70ch]">
+                The complete record you submitted in the eligibility form —
+                everything here was already answered and is reused
+                automatically. Use “Review &amp; edit answers” to change any
+                of it (the form opens fully prefilled).
+              </p>
+              {formSections.map((section) => {
+                const answered = section.questions.filter(
+                  (q) => savedAnswers[q.question_code] !== undefined
+                );
+                if (answered.length === 0) return null;
+                return (
+                  <Card key={section.section_id} className="mb-4">
+                    <h3 className="text-base mb-2">{section.section_name}</h3>
+                    <dl className="divide-y divide-line">
+                      {answered.map((q) => (
+                        <Row
+                          key={q.question_id}
+                          label={q.question_text}
+                          value={formatAnswer(savedAnswers[q.question_code])}
+                        />
+                      ))}
+                    </dl>
+                  </Card>
+                );
+              })}
+            </section>
+          )}
           <Section title="Personal">
             <Row label="Full name" value={citizen.full_name} />
             <Row label="Date of birth" value={citizen.date_of_birth} />

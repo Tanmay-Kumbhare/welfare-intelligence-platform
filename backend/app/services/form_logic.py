@@ -473,6 +473,13 @@ def validate_and_map_answer(
     if data_type == "INTEGER":
         if isinstance(value, bool):
             raise AnswerValidationError(f"Question '{code}' expects an integer value")
+        # Accept numeric strings ("3") — prefills and legacy clients may send
+        # stringified numbers; reject only non-numeric content.
+        if isinstance(value, str):
+            try:
+                value = float(value.strip().replace(",", ""))
+            except ValueError:
+                raise AnswerValidationError(f"Question '{code}' expects an integer value")
         if isinstance(value, int):
             typed = value
         elif isinstance(value, float) and value.is_integer():
@@ -483,7 +490,17 @@ def validate_and_map_answer(
         return ("answer_number", typed)
 
     if data_type == "DECIMAL":
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
+        if isinstance(value, bool):
+            raise AnswerValidationError(f"Question '{code}' expects a numeric value")
+        # Accept numeric strings ("85.3", "2,40,000") — deterministic parse,
+        # consistent with profile_mapping.normalize_number elsewhere.
+        if isinstance(value, str):
+            from app.services.profile_mapping import normalize_number
+
+            value = normalize_number(value)
+            if value is None:
+                raise AnswerValidationError(f"Question '{code}' expects a numeric value")
+        if not isinstance(value, (int, float)):
             raise AnswerValidationError(f"Question '{code}' expects a numeric value")
         typed = float(value)
         _apply_validation_rules(question, typed)

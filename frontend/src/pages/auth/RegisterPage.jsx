@@ -6,7 +6,7 @@ import PasswordInput from "../../components/ui/PasswordInput";
 import { extractApiErrorMessage } from "../../utils/apiError";
 import Select from "../../components/ui/Select";
 import Card from "../../components/ui/Card";
-import { ErrorState } from "../../components/ui/StatusStates";
+import { GoogleIcon, DigiLockerIcon } from "../../components/auth/AuthIcons";
 import { authService } from "../../services/api";
 import { saveToken, saveUser } from "../../services/auth";
 import {
@@ -64,6 +64,58 @@ export default function RegisterPage() {
   // Top-level form-wide error (e.g. API error).
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [loadingDigiLocker, setLoadingDigiLocker] = useState(false);
+
+  const handleGoogleLogin = async () => {
+    setError("");
+    setLoadingGoogle(true);
+    try {
+      sessionStorage.setItem("oauth_provider", "GOOGLE");
+      sessionStorage.setItem("oauth_redirect_path", "/profile");
+      const response = await authService.getGoogleAuthUrl("/profile");
+      const { url, state, code_verifier } = response.data;
+      sessionStorage.setItem("oauth_state", state);
+      if (code_verifier) {
+        sessionStorage.setItem("oauth_code_verifier", code_verifier);
+      }
+      window.location.href = url;
+    } catch (requestError) {
+      setLoadingGoogle(false);
+      setError(
+        extractApiErrorMessage(
+          requestError,
+          "Google sign-up is not configured yet. Please use email and password."
+        )
+      );
+    }
+  };
+
+  const handleDigiLockerLogin = async () => {
+    setError("");
+    setLoadingDigiLocker(true);
+    try {
+      sessionStorage.setItem("oauth_provider", "DIGILOCKER");
+      sessionStorage.setItem("oauth_redirect_path", "/profile");
+      const response = await authService.getDigiLockerAuthUrl("/profile");
+      const { url, state, code_verifier } = response.data;
+      sessionStorage.setItem("oauth_state", state);
+      if (code_verifier) {
+        sessionStorage.setItem("oauth_code_verifier", code_verifier);
+      }
+      window.location.href = url;
+    } catch (requestError) {
+      setLoadingDigiLocker(false);
+      setError(
+        extractApiErrorMessage(
+          requestError,
+          "DigiLocker sign-up is not configured yet. Please use email and password."
+        )
+      );
+    }
+  };
+
+  const anyLoading = loading || loadingGoogle || loadingDigiLocker;
 
   const update = (next) => setForm((current) => ({ ...current, ...next }));
 
@@ -172,6 +224,46 @@ export default function RegisterPage() {
 
       <Card>
         <div className="max-w-[560px] mx-auto">
+          {error && (
+            <div className="text-[13px] text-excl-ink bg-excl-tint border border-excl-tint rounded-sm px-3.5 py-2.5 mb-6">
+              {error}
+            </div>
+          )}
+
+          {/* Quick Sign Up via OAuth */}
+          <div className="space-y-3 mb-6">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={anyLoading}
+              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-line rounded-sm bg-white hover:bg-paper text-sm font-medium text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <GoogleIcon />
+              <span>
+                {loadingGoogle ? "Connecting to Google…" : "Continue with Google"}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDigiLockerLogin}
+              disabled={anyLoading}
+              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-line rounded-sm bg-white hover:bg-paper text-sm font-medium text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <DigiLockerIcon />
+              <span>
+                {loadingDigiLocker ? "Connecting to DigiLocker…" : "Continue with DigiLocker"}
+              </span>
+            </button>
+          </div>
+
+          <div className="relative my-6 flex items-center justify-center">
+            <div className="border-t border-line w-full" />
+            <span className="bg-paper-raised px-3 text-xs uppercase font-medium tracking-wider text-ink-soft absolute">
+              OR REGISTER WITH EMAIL &amp; PASSWORD
+            </span>
+          </div>
+
           <form onSubmit={submit} noValidate className="space-y-7">
             {/* ── Account credentials ── */}
             <div className="grid md:grid-cols-2 gap-x-5">

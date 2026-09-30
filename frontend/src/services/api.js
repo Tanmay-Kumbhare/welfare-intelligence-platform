@@ -39,6 +39,12 @@ export const citizenService = {
 export const authService = {
   register: (data) => authApi.post("/auth/register", data),
   login: (data) => authApi.post("/auth/login", data),
+  getGoogleAuthUrl: (redirectPath = "/") =>
+    authApi.get("/auth/google/url", { params: { redirect_path: redirectPath } }),
+  googleCallback: (data) => authApi.post("/auth/google/callback", data),
+  getDigiLockerAuthUrl: (redirectPath = "/") =>
+    authApi.get("/auth/digilocker/url", { params: { redirect_path: redirectPath } }),
+  digilockerCallback: (data) => authApi.post("/auth/digilocker/callback", data),
   me: () => api.get("/auth/me"),
   logout: () => api.post("/auth/logout"),
 };

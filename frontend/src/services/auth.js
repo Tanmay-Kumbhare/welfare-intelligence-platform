@@ -42,7 +42,12 @@ export function getUser() {
 
 export function saveUser(user) {
   try {
-    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    if (user) {
+      window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } else {
+      window.localStorage.removeItem(USER_KEY);
+    }
+    window.dispatchEvent(new Event("auth-change"));
   } catch {
     // ignore
   }
@@ -51,6 +56,7 @@ export function saveUser(user) {
 export function clearUser() {
   try {
     window.localStorage.removeItem(USER_KEY);
+    window.dispatchEvent(new Event("auth-change"));
   } catch {
     // no-op
   }
@@ -59,6 +65,11 @@ export function clearUser() {
 export function clearAuth() {
   clearToken();
   clearUser();
+  try {
+    window.dispatchEvent(new Event("auth-change"));
+  } catch {
+    // no-op
+  }
 }
 
 // Attach the current token to outbound auth requests. Other services remain

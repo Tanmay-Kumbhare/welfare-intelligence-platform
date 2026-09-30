@@ -1,11 +1,13 @@
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user_optional
 from app.api.v1.deps import get_optional_user, require_same_citizen
 from app.database import get_db
+from app.models.auth import UserAccount
 from app.schemas.citizen import (
     CitizenCreate,
     CitizenResponse,
@@ -21,10 +23,12 @@ router = APIRouter()
 @router.post("/", response_model=CitizenResponse, status_code=status.HTTP_201_CREATED)
 async def register_citizen(
     data: CitizenCreate,
-    db: AsyncSession = Depends(get_db)
+    current_user: Optional[UserAccount] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
 ) -> Any:
     service = CitizenService(db)
-    return await service.register_citizen(data)
+    user_id = current_user.user_id if current_user else None
+    return await service.register_citizen(data, user_id=user_id)
 
 
 @router.get("/{citizen_id}", response_model=CitizenResponse)
@@ -49,7 +53,6 @@ async def update_citizen(
     db: AsyncSession = Depends(get_db),
     user: Any = Depends(get_optional_user),
 ) -> Any:
-    print("DEBUG PAYLOAD:", data.profile_types)
     # Ownership first: an authenticated user must not edit another citizen.
     await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)

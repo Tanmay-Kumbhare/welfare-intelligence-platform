@@ -54,9 +54,18 @@ class CitizenService:
     def __init__(self, db: AsyncSession) -> None:
         self.repo = CitizenRepository(db)
 
-    async def register_citizen(self, data: CitizenCreate) -> CitizenResponse:
+    async def register_citizen(
+        self, data: CitizenCreate, user_id: Optional[uuid.UUID] = None
+    ) -> CitizenResponse:
         # Additional business logic/validation could go here
-        created = await self.repo.create(data)
+        if user_id:
+            existing = await self.repo.get_by_owning_user(user_id)
+            if existing:
+                updated = await self.repo.update_for_user(user_id, data.model_dump())
+                return _to_response(updated or existing)
+            created = await self.repo.create_for_user(user_id, data.model_dump())
+        else:
+            created = await self.repo.create(data)
         loaded = await self.repo.get_by_id(created.citizen_id)
         return _to_response(loaded or created)
 

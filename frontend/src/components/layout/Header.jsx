@@ -91,7 +91,7 @@ function UserMenu({ user, onLogout }) {
 }
 
 export default function Header() {
-  const user = getUser();
+  const [user, setUser] = useState(getUser);
   const [loggingOut, setLoggingOut] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const loginRef = useRef(null);
@@ -114,6 +114,18 @@ export default function Header() {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [loginOpen]);
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setUser(getUser());
+    };
+    window.addEventListener("auth-change", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("auth-change", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);

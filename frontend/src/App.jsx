@@ -13,6 +13,7 @@ import HelpPage from "./pages/HelpPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import OAuthCallbackPage from "./pages/auth/OAuthCallbackPage";
 import ProfileCompletionGate from "./pages/auth/ProfileCompletionGate";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminOverviewPage from "./pages/admin/AdminOverviewPage";
@@ -32,17 +33,18 @@ function App() {
         <Route element={<Layout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/auth/callback" element={<OAuthCallbackPage />} />
 
           <Route path="/" element={<HomePage />} />
 
           <Route element={<AuthLayout />}>
+            <Route path="/profile" element={<ProfilePage />} />
             <Route element={<ProfileCompletionGate />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/schemes" element={<SchemesPage />} />
               <Route path="/schemes/:id" element={<SchemeDetailPage />} />
               <Route path="/explore" element={<ExplorePage />} />
               <Route path="/help" element={<HelpPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/results/:citizenId" element={<ResultsPage />} />
               <Route path="/why-excluded/:citizenId/:schemeId" element={<WhyExcludedPage />} />
             </Route>

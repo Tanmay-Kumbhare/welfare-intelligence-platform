@@ -172,9 +172,9 @@ Structural DB round-trip reduction (tested, not latency-measured):
 
 ## 9. KNOWN LIMITATIONS
 
-- **No authentication.** Ownership is the localStorage `citizen_id` pointer;
-  anyone with the id can act as that citizen. Acceptable for development;
-  authentication is a planned later phase.
+- **Authentication**: Email/Password, Google OAuth, and DigiLocker OAuth are
+  implemented with unified UserAccount identity and SHA-256 session token hashing.
+  Live OAuth requires provider client credentials configured in backend/.env.
 - **No live scheme ingestion.** All 7 schemes are seed data. Source tables
   exist but nothing populates them yet.
 - **Document upload is not implemented** — the form's document questions are
@@ -266,5 +266,8 @@ engine still emits boolean results), recommendation intelligence.
 ## 15. Migrations
 
 Chain (never rewritten or squashed): `0001` (V1 core) → `0002` (V1 indexes /
-refinements) → `0003` (additive Phase 1/V2 foundation). Future schema changes
-require new additive Alembic migrations with working upgrade *and* downgrade.
+refinements) → `0003` (additive Phase 1/V2 foundation) →
+`0004_auth_user_and_ownership` (user account, roles, sessions, citizen link) →
+`0005_oauth_providers_and_account_linking` (nullable password_hash, google_id,
+digilocker_id, full_name). Future schema changes require new additive Alembic
+migrations with working upgrade *and* downgrade.

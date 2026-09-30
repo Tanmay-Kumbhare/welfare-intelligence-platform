@@ -1,10 +1,12 @@
-﻿import uuid
-from typing import Any
+import uuid
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user_optional
 from app.database import get_db
+from app.models.auth import UserAccount
 from app.schemas.citizen import CitizenCreate, CitizenResponse, CitizenUpdate
 from app.services.citizen_service import CitizenService
 
@@ -14,10 +16,12 @@ router = APIRouter()
 @router.post("/", response_model=CitizenResponse, status_code=status.HTTP_201_CREATED)
 async def register_citizen(
     data: CitizenCreate,
-    db: AsyncSession = Depends(get_db)
+    current_user: Optional[UserAccount] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
 ) -> Any:
     service = CitizenService(db)
-    return await service.register_citizen(data)
+    user_id = current_user.user_id if current_user else None
+    return await service.register_citizen(data, user_id=user_id)
 
 
 @router.get("/{citizen_id}", response_model=CitizenResponse)

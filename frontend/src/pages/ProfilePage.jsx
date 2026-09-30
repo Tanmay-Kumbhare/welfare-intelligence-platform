@@ -54,10 +54,10 @@ function data(citizen) {
   };
 }
 
-function Editor({ value, setValue, save, cancel, saving, error }) {
+function Editor({ value, setValue, save, cancel, saving, error, submitLabel = "Save profile" }) {
   const root = (field, next) => setValue((current) => ({ ...current, [field]: next }));
   const nested = (group, field, next) =>
-    setValue((current) => ({ ...current, [group]: { ...current[group], [field]: next } }));
+    setValue((current) => ({ ...current, [group]: { ...(current[group] || {}), [field]: next } }));
 
   const field = (group, key, label, type = "text") => (
     <Input
@@ -65,7 +65,7 @@ function Editor({ value, setValue, save, cancel, saving, error }) {
       key={key}
       label={label}
       type={type}
-      value={value[group][key] ?? ""}
+      value={value[group]?.[key] ?? ""}
       onChange={(e) =>
         nested(group, key, e.target.value === "" ? null : type === "number" ? Number(e.target.value) : e.target.value)
       }
@@ -117,11 +117,11 @@ function Editor({ value, setValue, save, cancel, saving, error }) {
             {field("location", "district", "District")}
             {field("location", "village_city", "Village / city")}
             {field("location", "area_type", "Area type")}
-            <Select id="profile-bpl" label="BPL card holder" value={String(value.financial.is_bpl_card_holder)} onChange={(e) => nested("financial", "is_bpl_card_holder", e.target.value === "true")}>
+            <Select id="profile-bpl" label="BPL card holder" value={String(value.financial?.is_bpl_card_holder)} onChange={(e) => nested("financial", "is_bpl_card_holder", e.target.value === "true")}>
               <option value="false">No</option>
               <option value="true">Yes</option>
             </Select>
-            <Select id="profile-tax" label="Income-tax payer" value={String(value.financial.is_income_tax_payer)} onChange={(e) => nested("financial", "is_income_tax_payer", e.target.value === "true")}>
+            <Select id="profile-tax" label="Income-tax payer" value={String(value.financial?.is_income_tax_payer)} onChange={(e) => nested("financial", "is_income_tax_payer", e.target.value === "true")}>
               <option value="false">No</option>
               <option value="true">Yes</option>
             </Select>
@@ -130,7 +130,7 @@ function Editor({ value, setValue, save, cancel, saving, error }) {
       </section>
       <div className="flex justify-end gap-3">
         <Button type="button" variant="secondary" onClick={cancel} disabled={saving}>Cancel</Button>
-        <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save profile"}</Button>
+        <Button type="submit" disabled={saving}>{saving ? "Saving..." : submitLabel}</Button>
       </div>
     </form>
   );
@@ -152,7 +152,39 @@ export default function ProfilePage() {
       const id = me.data.citizen_id;
       setCitizenId(id);
       if (!id) {
-        setStatus("empty");
+        setDraft({
+          full_name: me.data.full_name || me.data.citizen_name || "",
+          date_of_birth: "",
+          gender: "",
+          mobile_number: "",
+          email_id: me.data.email || "",
+          citizen_type: "GENERAL",
+          demographic: {
+            education_level: "",
+            occupation: "",
+            family_size: null,
+            marital_status: "",
+            social_category: "",
+            disability_status: "NONE",
+          },
+          financial: {
+            annual_income: null,
+            employment_status: "",
+            income_source: "",
+            poverty_category: "",
+            land_holding_size: null,
+            is_bpl_card_holder: false,
+            is_income_tax_payer: false,
+          },
+          location: {
+            state: "",
+            district: "",
+            village_city: "",
+            area_type: "",
+          },
+        });
+        setEditing(true);
+        setStatus("needs-profile");
         return;
       }
       const response = await citizenService.get(id);
@@ -176,16 +208,24 @@ export default function ProfilePage() {
 
   const save = async (event) => {
     event.preventDefault();
-    if (!draft.full_name.trim() || !draft.date_of_birth) {
+    if (!draft.full_name?.trim() || !draft.date_of_birth) {
       return setError("Full name and date of birth are required.");
     }
     setSaving(true);
     setError("");
     try {
-      const response = await citizenService.update(citizenId, draft);
-      setCitizen(response.data);
-      setDraft(data(response.data));
+      let response;
+      if (citizenId) {
+        response = await citizenService.update(citizenId, draft);
+      } else {
+        response = await citizenService.register(draft);
+      }
+      const savedCitizen = response.data;
+      setCitizenId(savedCitizen.citizen_id);
+      setCitizen(savedCitizen);
+      setDraft(data(savedCitizen));
       setEditing(false);
+      setStatus("ready");
     } catch (requestError) {
       setError(
         extractApiErrorMessage(
@@ -212,12 +252,34 @@ export default function ProfilePage() {
     );
   }
 
+  if (status === "needs-profile") {
+    return (
+      <div>
+        <div className="mb-8 border-b border-line pb-7">
+          <h1 className="text-[30px] mb-3">Complete your citizen profile</h1>
+          <p className="max-w-[60ch] text-ink-soft">
+            Please fill in your details below so we can evaluate your eligibility for government schemes and save your results.
+          </p>
+        </div>
+        <Editor
+          value={draft}
+          setValue={setDraft}
+          save={save}
+          cancel={() => navigate("/")}
+          saving={saving}
+          error={error}
+          submitLabel="Save and create profile"
+        />
+      </div>
+    );
+  }
+
   if (status === "empty" || !citizenId) {
     return (
       <EmptyState
-        title="No citizen profile yet"
-        message="Create an account and complete your profile to check your eligibility against the active scheme rules."
-        action={<Button to="/register" variant="primary">Create account</Button>}
+        title="Sign in required"
+        message="Please sign in or create an account to view and edit your citizen profile."
+        action={<Button to="/login" variant="primary">Sign in</Button>}
       />
     );
   }

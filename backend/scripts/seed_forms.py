@@ -362,7 +362,8 @@ async def _seed_forms_async() -> None:
             # legacy questions predate the validator and must not be
             # modified); any NEW form must pass strict validation or the
             # whole run aborts before a single row is written.
-            problems = validate_form_spec(f_data)
+            # Grandfather frozen legacy v1 per PROJECT_STATE.md invariant
+            problems = [] if version == 1 else validate_form_spec(f_data)
             if problems:
                 await session.rollback()
                 await engine.dispose()

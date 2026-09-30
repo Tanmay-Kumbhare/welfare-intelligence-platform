@@ -89,8 +89,20 @@ function UserMenu({ user, onLogout }) {
 }
 
 export default function Header() {
-  const user = getUser();
+  const [user, setUser] = useState(getUser);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setUser(getUser());
+    };
+    window.addEventListener("auth-change", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("auth-change", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -125,7 +137,16 @@ export default function Header() {
             </NavLink>
           </nav>
 
-          {user && <UserMenu user={user} onLogout={handleLogout} />}
+          {user ? (
+            <UserMenu user={user} onLogout={handleLogout} />
+          ) : (
+            <NavLink
+              to="/login"
+              className="font-sans text-sm px-3.5 py-1.5 rounded-sm border border-line hover:border-ink-soft text-ink font-medium transition-colors"
+            >
+              Sign in
+            </NavLink>
+          )}
         </div>
       </div>
     </header>

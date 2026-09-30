@@ -5,9 +5,9 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 5173,
     proxy: {
       "/api": "http://127.0.0.1:8000",
-      "/auth": "http://127.0.0.1:8000",
     },
   },
   // Automatic JSX runtime also for the Vitest transform pipeline (the react

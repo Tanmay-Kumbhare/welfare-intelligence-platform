@@ -1,4 +1,4 @@
-﻿"""
+"""
 FastAPI application entry point.
 """
 
@@ -33,4 +33,4 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Simple health check endpoint."""
-    return {"status": "ok"}
+    return {"status": "ok"}

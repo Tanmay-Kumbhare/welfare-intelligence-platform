@@ -1,4 +1,4 @@
-﻿"""
+"""
 Application configuration.
 All settings are read from environment variables (or backend/.env).
 No configuration values are hardcoded here.
@@ -53,6 +53,21 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
 
     # ------------------------------------------------------------------
+    # Google OAuth (configured via environment variables)
+    # ------------------------------------------------------------------
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:5173/auth/callback"
+
+    # ------------------------------------------------------------------
+    # DigiLocker OAuth (configured via environment variables)
+    # ------------------------------------------------------------------
+    DIGILOCKER_CLIENT_ID: str = ""
+    DIGILOCKER_CLIENT_SECRET: str = ""
+    DIGILOCKER_REDIRECT_URI: str = "http://localhost:5173/auth/callback"
+    DIGILOCKER_BASE_URL: str = "https://digilocker.meripehchaan.gov.in"
+
+    # ------------------------------------------------------------------
     # Derived helpers
     # ------------------------------------------------------------------
     @property
@@ -73,3 +88,4 @@ def get_settings() -> Settings:
     behaviour for a long-running FastAPI application.
     """
     return Settings()
+

@@ -1,32 +1,63 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import PasswordInput from "../../components/ui/PasswordInput";
-import { extractApiErrorMessage } from "../../utils/apiError";
 import Card from "../../components/ui/Card";
-import { ErrorState, LoadingState } from "../../components/ui/StatusStates";
+import { extractApiErrorMessage } from "../../utils/apiError";
 import { authService } from "../../services/api";
-import { saveToken, saveUser } from "../../services/auth";
+import { saveToken, saveUser, getUser } from "../../services/auth";
+
+import { GoogleIcon, DigiLockerIcon } from "../../components/auth/AuthIcons";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("from") || "/";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [infoMessage, setInfoMessage] = useState("");
+  const [loadingEmail, setLoadingEmail] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [loadingDigiLocker, setLoadingDigiLocker] = useState(false);
 
-  const submit = async (event) => {
+  // If already logged in, redirect to home or returnTo
+  useEffect(() => {
+    const existing = getUser();
+    if (existing?.user_id) {
+      navigate(returnTo, { replace: true });
+    }
+  }, [navigate, returnTo]);
+
+  // Handle URL errors (e.g. from cancelled OAuth)
+  useEffect(() => {
+    const err = searchParams.get("error");
+    if (err) {
+      if (err === "access_denied") {
+        setError("Sign in was cancelled.");
+      } else {
+        setError(searchParams.get("error_description") || "Authentication could not be completed.");
+      }
+    }
+  }, [searchParams]);
+
+  const anyLoading = loadingEmail || loadingGoogle || loadingDigiLocker;
+
+  // 1. Email & Password Sign In
+  const handleEmailSubmit = async (event) => {
     event.preventDefault();
     setError("");
-    setLoading(true);
+    setInfoMessage("");
+    setLoadingEmail(true);
+
     try {
       const response = await authService.login({ email, password });
       const { token, user_id, email: loggedInEmail } = response.data;
       saveToken(token);
       saveUser({ user_id, email: loggedInEmail });
-      navigate("/");
-      return;
+      navigate(returnTo, { replace: true });
     } catch (requestError) {
       setError(
         extractApiErrorMessage(
@@ -34,66 +65,202 @@ export default function LoginPage() {
           "We could not sign you in. Please check your email and password."
         )
       );
-      return;
     } finally {
-      setLoading(false);
+      setLoadingEmail(false);
     }
   };
 
+  // 2. Continue with Google
+  const handleGoogleLogin = async () => {
+    setError("");
+    setInfoMessage("");
+    setLoadingGoogle(true);
+
+    try {
+      sessionStorage.setItem("oauth_provider", "GOOGLE");
+      sessionStorage.setItem("oauth_redirect_path", returnTo);
+
+      const response = await authService.getGoogleAuthUrl(returnTo);
+      const { url, state, code_verifier } = response.data;
+
+      sessionStorage.setItem("oauth_state", state);
+      if (code_verifier) {
+        sessionStorage.setItem("oauth_code_verifier", code_verifier);
+      }
+
+      window.location.href = url;
+    } catch (requestError) {
+      setLoadingGoogle(false);
+      setError(
+        extractApiErrorMessage(
+          requestError,
+          "Google sign-in is not configured yet. Please use email and password."
+        )
+      );
+    }
+  };
+
+  // 3. Continue with DigiLocker
+  const handleDigiLockerLogin = async () => {
+    setError("");
+    setInfoMessage("");
+    setLoadingDigiLocker(true);
+
+    try {
+      sessionStorage.setItem("oauth_provider", "DIGILOCKER");
+      sessionStorage.setItem("oauth_redirect_path", returnTo);
+
+      const response = await authService.getDigiLockerAuthUrl(returnTo);
+      const { url, state, code_verifier } = response.data;
+
+      sessionStorage.setItem("oauth_state", state);
+      if (code_verifier) {
+        sessionStorage.setItem("oauth_code_verifier", code_verifier);
+      }
+
+      window.location.href = url;
+    } catch (requestError) {
+      setLoadingDigiLocker(false);
+      setError(
+        extractApiErrorMessage(
+          requestError,
+          "DigiLocker sign-in is not configured yet. Please use email and password."
+        )
+      );
+    }
+  };
+
+  const handleForgotPassword = (e) => {
+    e.preventDefault();
+    setInfoMessage(
+      "Password reset is disabled in development mode. You can create a new account or sign in with another method."
+    );
+  };
+
   return (
-    <div>
-      <div className="mb-9 border-b border-line pb-7">
-        <h1 className="text-[30px] mb-3">Sign in</h1>
-        <p className="max-w-[56ch]">
-          Welcome back. Sign in with the email and password you used when you
-          created your account.
+    <div className="py-6 sm:py-10">
+      <div className="mb-8 border-b border-line pb-6 max-w-[440px] mx-auto text-center">
+        <h1 className="text-[28px] sm:text-[32px] font-semibold text-ink mb-2">
+          Welcome Back
+        </h1>
+        <p className="text-sm text-ink-soft">
+          Sign in to check your welfare scheme eligibility and view your profile.
         </p>
       </div>
 
-      <Card>
-        <div className="max-w-[420px] mx-auto">
-          <form onSubmit={submit} noValidate className="space-y-6">
+      <div className="max-w-[440px] mx-auto">
+        <Card className="p-6 sm:p-8">
+          {error && (
+            <div
+              className="text-[13px] text-excl-ink bg-excl-tint border border-excl-tint rounded-sm px-3.5 py-2.5 mb-5"
+              role="alert"
+            >
+              {error}
+            </div>
+          )}
+
+          {infoMessage && (
+            <div
+              className="text-[13px] text-accent-ink bg-accent-tint border border-accent-tint rounded-sm px-3.5 py-2.5 mb-5"
+              role="status"
+            >
+              {infoMessage}
+            </div>
+          )}
+
+          {/* Social / OAuth Options */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={anyLoading}
+              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-line rounded-sm bg-white hover:bg-paper text-sm font-medium text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <GoogleIcon />
+              <span>
+                {loadingGoogle ? "Connecting to Google…" : "Continue with Google"}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDigiLockerLogin}
+              disabled={anyLoading}
+              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-line rounded-sm bg-white hover:bg-paper text-sm font-medium text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <DigiLockerIcon />
+              <span>
+                {loadingDigiLocker ? "Connecting to DigiLocker…" : "Continue with DigiLocker"}
+              </span>
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-6 flex items-center justify-center">
+            <div className="border-t border-line w-full" />
+            <span className="bg-paper-raised px-3 text-xs uppercase font-medium tracking-wider text-ink-soft absolute">
+              OR
+            </span>
+          </div>
+
+          {/* Email & Password Form */}
+          <form onSubmit={handleEmailSubmit} noValidate className="space-y-5">
             <Input
               id="login-email"
-              label="Email address"
+              label="Email"
               type="email"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
+              disabled={anyLoading}
             />
 
-            <PasswordInput
-              id="login-password"
-              label="Password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-            />
-
-            {error && (
-              <div className="text-[13px] text-excl-ink bg-excl-tint border border-excl-tint rounded-sm px-3 py-2">
-                {error}
+            <div>
+              <PasswordInput
+                id="login-password"
+                label="Password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                disabled={anyLoading}
+              />
+              <div className="flex justify-end mt-1.5">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-xs text-ink-soft hover:text-ink transition-colors"
+                >
+                  Forgot password?
+                </button>
               </div>
-            )}
+            </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <Link to="/register" className="text-sm text-ink-soft hover:text-ink">
-                Don’t have an account? Sign up
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              disabled={anyLoading || !email || !password}
+            >
+              {loadingEmail ? "Signing in…" : "Continue"}
+            </Button>
+
+            <div className="text-center pt-2">
+              <Link
+                to="/register"
+                className="text-xs sm:text-sm text-ink-soft hover:text-ink transition-colors"
+              >
+                Don’t have an account? <span className="font-semibold text-accent-ink hover:underline">Sign up</span>
               </Link>
-              <Button type="submit" disabled={loading || !email || !password}>
-                {loading ? "Signing in..." : "Sign in"}
-              </Button>
             </div>
           </form>
-        </div>
-      </Card>
+        </Card>
 
-      <p className="mt-8 text-center text-xs text-ink-soft">
-        This is a demo welfare portal. Account data is stored only so you can
-        sign in again and see your own profile.
-      </p>
+        <p className="mt-6 text-center text-xs text-ink-soft">
+          Official identity and welfare data are protected and evaluated deterministically.
+        </p>
+      </div>
     </div>
   );
 }

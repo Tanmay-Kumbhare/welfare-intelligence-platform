@@ -98,7 +98,7 @@ REGISTRY: dict[str, ProfileField] = {
     "demographic.social_category": _pf(domain="demographic", column="social_category",
                                        data_type="STRING", fact_code="SOCIAL_CATEGORY",
                                        bare_names=("social_category", "category"),
-                                       choices=("GEN", "OBC", "SC", "ST")),
+                                       choices=("GEN", "OBC", "SC", "ST", "VJNT", "SBC", "MINORITY")),
     "demographic.marital_status": _pf(domain="demographic", column="marital_status",
                                       data_type="STRING", fact_code="MARITAL_STATUS",
                                       bare_names=("marital_status",),

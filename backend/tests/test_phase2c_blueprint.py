@@ -462,7 +462,7 @@ class TestV3Structure:
     def test_question_count(self, client):
         detail = _form_detail(client, "GENERAL_CITIZEN_PROFILE")
         total = sum(len(s["questions"]) for s in detail["sections"])
-        assert total == 61
+        assert total == 66
 
     def test_v2_is_frozen(self, client):
         """v2 must remain exactly as seeded: 12 sections, 64 questions —
@@ -500,7 +500,7 @@ class TestV3Structure:
             for q in s["questions"]
             if q.get("conditions")
         ]
-        assert len(conditional) == 32
+        assert len(conditional) == 37
         course = next(q for s in detail["sections"] for q in s["questions"]
                       if q["question_code"] == "COURSE_NAME")
         assert course["conditions"][0]["depends_on_question_code"] == "CURRENTLY_STUDYING"

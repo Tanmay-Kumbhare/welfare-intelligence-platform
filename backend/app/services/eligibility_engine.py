@@ -16,6 +16,47 @@ from app.utils.date_calc import calculate_age
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_PARAMETER_WEIGHTS: dict[str, int] = {
+    # Income (25)
+    "annual_income": 25,
+    "poverty_category": 25,
+    "is_bpl_card_holder": 25,
+    "is_income_tax_payer": 25,
+    # Social Category (25)
+    "social_category": 25,
+    "caste_category": 25,
+    # Education (20)
+    "education_level": 20,
+    "academic_percentage": 20,
+    "marksheet_percentage": 20,
+    "academic_cgpa": 20,
+    "course": 20,
+    "branch": 20,
+    "admission_type": 20,
+    # Persona / Citizen Type (20)
+    "citizen_type": 20,
+    # Age (15)
+    "age": 15,
+    # Location (10)
+    "state": 10,
+    "area_type": 10,
+    "district": 10,
+    # Other criteria: 5
+    "employment_status": 5,
+    "disability_status": 5,
+    "land_holding_size": 15,
+}
+
+
+def get_rule_weight(rule: SchemeEligibilityRule) -> int:
+    """Return configured rule weight or fallback to standard category default."""
+    custom_weight = getattr(rule, "weight", None)
+    if custom_weight is not None and isinstance(custom_weight, (int, float)) and custom_weight > 0:
+        return int(custom_weight)
+    param = (getattr(rule, "parameter_name", "") or "").lower()
+    return DEFAULT_PARAMETER_WEIGHTS.get(param, 5)
+
+
 class EligibilityEngine:
     """Core rule evaluation engine."""
 
@@ -35,22 +76,43 @@ class EligibilityEngine:
         passed_rules_count = 0
         failed_rules_count = 0
         missing_rules_count = 0
+        passed_rules = 0
+        total_weight = 0
+        passed_weight = 0
+        matched_rules = []
+        failed_rules = []
+        unknown_rules = []
+        failed_mandatory_rules = []
 
         for group in scheme.rule_groups:
             rule_results = []
             
             for rule in group.rules:
+                total_rules += 1
+                rule_w = get_rule_weight(rule)
+                total_weight += rule_w
+
                 actual_value = self._resolve_parameter(citizen, rule.parameter_name, facts_dict=facts_dict)
                 is_missing = actual_value is None
                 passed = self._apply_operator(actual_value, rule.operator, rule.required_value)
+                desc = rule.rule_description or rule.parameter_name
 
-                total_rules += 1
                 if passed:
+                    passed_rules += 1
                     passed_rules_count += 1
+                    passed_weight += rule_w
+                    matched_rules.append(desc)
+                    status_str = "PASS"
                 elif is_missing:
                     missing_rules_count += 1
+                    desc_unknown = f"{desc} (Not provided)"
+                    unknown_rules.append(desc_unknown)
+                    failed_rules.append(desc_unknown)
+                    status_str = "UNKNOWN"
                 else:
                     failed_rules_count += 1
+                    failed_rules.append(desc)
+                    status_str = "FAIL"
 
                 rule_results.append({
                     "parameter": rule.parameter_name,
@@ -59,13 +121,20 @@ class EligibilityEngine:
                     "required": rule.required_value,
                     "passed": passed,
                     "is_missing": is_missing,
+                    "status": status_str,
                     "description": rule.rule_description,
+                    "weight": rule_w,
                 })
 
             if group.intra_group_operator.upper() == "AND":
                 group_passed = all(r["passed"] for r in rule_results) if rule_results else True
             else:  # OR
                 group_passed = any(r["passed"] for r in rule_results) if rule_results else True
+
+            if not group_passed:
+                for r in rule_results:
+                    if not r["passed"]:
+                        failed_mandatory_rules.append(r["description"] or r["parameter"])
 
             group_results.append({
                 "group_name": group.group_name,
@@ -90,9 +159,22 @@ class EligibilityEngine:
             if total_rules > 0
             else 0.0
         )
+        if total_weight > 0:
+            match_score = round((passed_weight / total_weight) * 100)
+        else:
+            match_score = 100 if overall_result else 0
 
         evaluation_details = {
             "overall_result": overall_result,
+            "match_score": match_score,
+            "total_rules": total_rules,
+            "passed_rules": passed_rules,
+            "total_weight": total_weight,
+            "passed_weight": passed_weight,
+            "matched_rules": matched_rules,
+            "failed_rules": failed_rules,
+            "unknown_rules": unknown_rules,
+            "failed_mandatory_rules": failed_mandatory_rules,
             "group_combining_operator": scheme.group_combining_operator,
             "rule_match_score": rule_match_score,
             "total_rules": total_rules,
@@ -105,11 +187,6 @@ class EligibilityEngine:
         if overall_result:
             reason = f"Citizen meets all criteria for {scheme.scheme_name}."
         else:
-            failed_rules = []
-            for g in group_results:
-                for r in g["rules"]:
-                    if not r["passed"]:
-                        failed_rules.append(r["description"] or r["parameter"])
             reason = f"Does not meet criteria: {', '.join(failed_rules)}"
 
         return overall_result, evaluation_details, reason
@@ -157,14 +234,16 @@ class EligibilityEngine:
                     return float(inc_val)
                 except (TypeError, ValueError):
                     pass
-            return float(citizen.financial_profile.annual_income) if citizen.financial_profile and citizen.financial_profile.annual_income is not None else 0.0
-            
+            if citizen.financial_profile and citizen.financial_profile.annual_income is not None:
+                return float(citizen.financial_profile.annual_income)
+            return None
+
         elif parameter_name == "poverty_category":
             pov_val = self._fact_value(citizen, "POVERTY_CATEGORY", facts_dict=facts_dict)
             if pov_val is not None:
                 return pov_val
             return citizen.financial_profile.poverty_category if citizen.financial_profile else None
-            
+
         elif parameter_name == "land_holding_size":
             land_val = self._fact_value(citizen, "LAND_HOLDING_SIZE", facts_dict=facts_dict)
             if land_val is not None:
@@ -172,38 +251,44 @@ class EligibilityEngine:
                     return float(land_val)
                 except (TypeError, ValueError):
                     pass
-            return float(citizen.financial_profile.land_holding_size) if citizen.financial_profile and citizen.financial_profile.land_holding_size is not None else 0.0
-            
+            if citizen.financial_profile and citizen.financial_profile.land_holding_size is not None:
+                return float(citizen.financial_profile.land_holding_size)
+            return None
+
         elif parameter_name == "is_bpl_card_holder":
             bpl_val = self._fact_value(citizen, "IS_BPL_CARD_HOLDER", facts_dict=facts_dict)
             if bpl_val is not None:
                 return bpl_val in ("True", "true", "1", "YES", True)
-            return citizen.financial_profile.is_bpl_card_holder if citizen.financial_profile else False
-            
+            if citizen.financial_profile and citizen.financial_profile.is_bpl_card_holder is not None:
+                return citizen.financial_profile.is_bpl_card_holder
+            return None
+
         elif parameter_name == "is_income_tax_payer":
             tax_val = self._fact_value(citizen, "IS_INCOME_TAX_PAYER", facts_dict=facts_dict)
             if tax_val is not None:
                 return tax_val in ("True", "true", "1", "YES", True)
-            return citizen.financial_profile.is_income_tax_payer if citizen.financial_profile else False
-            
+            if citizen.financial_profile and citizen.financial_profile.is_income_tax_payer is not None:
+                return citizen.financial_profile.is_income_tax_payer
+            return None
+
         elif parameter_name == "employment_status":
             fact_value = self._fact_value(citizen, "EMPLOYMENT_STATUS", facts_dict=facts_dict)
             if fact_value is not None:
                 return fact_value
             return citizen.financial_profile.employment_status if citizen.financial_profile else None
-            
+
         elif parameter_name == "social_category":
             soc_val = self._fact_value(citizen, "SOCIAL_CATEGORY", facts_dict=facts_dict)
             if soc_val is not None:
                 return soc_val
             return citizen.demographic_profile.social_category if citizen.demographic_profile else None
-            
+
         elif parameter_name == "education_level":
             fact_value = self._fact_value(citizen, "EDUCATION_LEVEL", facts_dict=facts_dict)
             if fact_value is not None:
                 return fact_value
             return citizen.demographic_profile.education_level if citizen.demographic_profile else None
-            
+
         elif parameter_name == "disability_status":
             fact_value = self._fact_value(citizen, "DISABILITY_STATUS", facts_dict=facts_dict)
             if fact_value == "YES":
@@ -212,7 +297,9 @@ class EligibilityEngine:
                 return "NONE"
             if fact_value == "PENDING":
                 return "PENDING"
-            return citizen.demographic_profile.disability_status if citizen.demographic_profile else "NONE"
+            if fact_value is not None:
+                return fact_value
+            return citizen.demographic_profile.disability_status if citizen.demographic_profile else None
             
         elif parameter_name == "area_type":
             area_val = self._fact_value(citizen, "AREA_TYPE", facts_dict=facts_dict)

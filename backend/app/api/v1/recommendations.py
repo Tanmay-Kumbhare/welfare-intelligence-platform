@@ -4,8 +4,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_optional_user, require_same_citizen
+from app.api.v1.deps import get_authenticated_user, require_same_citizen
 from app.database import get_db
+from app.models.auth import UserAccount
 from app.repositories.assessment_repository import AssessmentRepository
 from app.repositories.citizen_repository import CitizenRepository
 from app.schemas.assessment import RecommendationsResponse, RecommendationItem
@@ -17,7 +18,7 @@ router = APIRouter()
 async def get_citizen_recommendations(
     citizen_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     """
     Returns the previously stored eligibility assessments formatted as recommendations.
@@ -72,9 +73,37 @@ async def get_citizen_recommendations(
         if len(a.scheme.documents) > 0:
             doc_status = "COMPLETE" if is_complete else "MISSING_DOCUMENTS"
 
-        rule_match_score = None
-        if a.evaluation_details and isinstance(a.evaluation_details, dict):
-            rule_match_score = a.evaluation_details.get("rule_match_score")
+        eval_details = a.evaluation_details or {}
+        rule_match_score = eval_details.get("rule_match_score")
+        match_score = eval_details.get("match_score")
+        if match_score is None:
+            # Fallback derivation directly from rules structure
+            total_r = 0
+            passed_r = 0
+            m_rules = []
+            f_rules = []
+            for g in eval_details.get("groups", []):
+                for r in g.get("rules", []):
+                    total_r += 1
+                    desc = r.get("description") or r.get("parameter", "")
+                    if r.get("passed"):
+                        passed_r += 1
+                        m_rules.append(desc)
+                    else:
+                        f_rules.append(desc)
+            match_score = (
+                round((passed_r / total_r) * 100.0, 1)
+                if total_r > 0
+                else (100.0 if a.eligibility_result else 0.0)
+            )
+            matched_rules = m_rules
+            failed_rules = f_rules
+        else:
+            matched_rules = eval_details.get("matched_rules", [])
+            failed_rules = eval_details.get("failed_rules", [])
+
+        unknown_rules = eval_details.get("unknown_rules", [])
+        failed_mandatory_rules = eval_details.get("failed_mandatory_rules", [])
 
         from app.services.gap_analysis_service import GapAnalysisService
         gap_analysis = GapAnalysisService.analyze_gaps(
@@ -87,6 +116,11 @@ async def get_citizen_recommendations(
             scheme=a.scheme,
             eligibility_result=a.eligibility_result,
             rule_match_score=rule_match_score,
+            match_score=float(match_score) if match_score is not None else None,
+            matched_rules=matched_rules,
+            failed_rules=failed_rules,
+            unknown_rules=unknown_rules,
+            failed_mandatory_rules=failed_mandatory_rules,
             reason=a.reason,
             evaluation_details=a.evaluation_details,
             assessment_date=a.assessment_date,
@@ -120,3 +154,4 @@ async def get_citizen_recommendations(
         eligible_schemes=eligible_ranked,
         ineligible_schemes=ineligible_ranked,
     )
+

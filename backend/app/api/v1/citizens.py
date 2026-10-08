@@ -65,13 +65,7 @@ async def update_citizen(
     citizen = await service.update_citizen(citizen_id, data)
     if not citizen:
         raise HTTPException(status_code=404, detail="Citizen not found")
-    # Keep the profile-fact layer in step with the profile edit
-    sync = ProfileSyncService(db)
-    sync_summary = await sync.sync_facts_from_profile(citizen_id)
-    return {
-        **_citizen_response_dict(citizen),
-        "fact_sync": sync_summary,
-    }
+    return citizen
 
 
 # ----------------------------------------------------------------------

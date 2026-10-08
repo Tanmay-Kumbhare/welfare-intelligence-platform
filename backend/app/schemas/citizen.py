@@ -187,6 +187,9 @@ class CitizenResponse(BaseModel):
     financial: Optional[FinancialProfileResponse] = None
     location: Optional[LocationProfileResponse] = None
     education_records: list[EducationRecordResponse] = []
+    profile_status: str = "INCOMPLETE"
+    profile_completion: int = 0
+    missing_fields: list[str] = []
 
 
 class FactSyncSummary(BaseModel):

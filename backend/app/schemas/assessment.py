@@ -56,16 +56,26 @@ class AssessmentResponse(BaseModel):
     citizen_id: uuid.UUID
     scheme_id: uuid.UUID
     eligibility_result: bool
+    match_score: Optional[float] = None
+    matched_rules: list[str] = []
+    failed_rules: list[str] = []
+    unknown_rules: list[str] = []
+    failed_mandatory_rules: list[str] = []
     reason: Optional[str] = None
     evaluation_details: Optional[dict[str, Any]] = None
     assessment_date: date
 
 
 class RecommendationItem(BaseModel):
-    """Single item in a citizen''s recommendations list."""
+    """Single item in a citizen's recommendations list."""
     scheme: SchemeResponse
     eligibility_result: bool
     rule_match_score: Optional[float] = None
+    match_score: Optional[float] = None
+    matched_rules: list[str] = []
+    failed_rules: list[str] = []
+    unknown_rules: list[str] = []
+    failed_mandatory_rules: list[str] = []
     reason: Optional[str] = None
     evaluation_details: Optional[dict[str, Any]] = None
     assessment_date: date
@@ -85,3 +95,4 @@ class RecommendationsResponse(BaseModel):
     ineligible_count: int
     eligible_schemes: list[RecommendationItem]
     ineligible_schemes: list[RecommendationItem]
+

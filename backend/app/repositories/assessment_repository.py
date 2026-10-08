@@ -1,4 +1,4 @@
-﻿"""
+"""
 Assessment repository — async SQLAlchemy queries for eligibility assessments.
 """
 
@@ -74,6 +74,7 @@ class AssessmentRepository:
             constraint="uq_citizen_scheme_assessment",
             set_={
                 "eligibility_result": stmt.excluded.eligibility_result,
+                "confidence_score": stmt.excluded.confidence_score,
                 "reason": stmt.excluded.reason,
                 "evaluation_details": stmt.excluded.evaluation_details,
                 "assessment_date": stmt.excluded.assessment_date,

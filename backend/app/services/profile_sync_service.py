@@ -51,8 +51,13 @@ _VERIFIED_SOURCES = ("ADMIN_VERIFIED", "GOVERNMENT_API", "EXTERNAL_VERIFICATION"
 # profile row). Values are read from CitizenMaster columns.
 _IDENTITY_KEYS = {
     "citizen.full_name": lambda c: c.full_name,
+    "citizen.date_of_birth": lambda c: c.date_of_birth,
+    "citizen.gender": lambda c: c.gender,
     "citizen.mobile_number": lambda c: c.mobile_number,
     "citizen.email_id": lambda c: c.email_id,
+    "citizen.citizen_type": lambda c: c.citizen_type,
+    "demographic.date_of_birth": lambda c: c.date_of_birth,
+    "demographic.gender": lambda c: c.gender,
 }
 
 # profile_field registry keys for the identity answers the form never asks
@@ -64,6 +69,7 @@ _PREFILL_IDENTITY_BARE = {
     "gender": lambda c: c.gender,
     "mobile_number": lambda c: c.mobile_number,
     "email_id": lambda c: c.email_id,
+    "citizen_type": lambda c: c.citizen_type,
 }
 
 
@@ -116,7 +122,7 @@ class ProfileSyncService:
             if existing is None:
                 if serialized is None:
                     continue  # nothing to create from an empty profile field
-                await self.profiles.create_fact(
+                new_fact = await self.profiles.create_fact(
                     citizen_id=citizen_id,
                     fact_code=fact_code,
                     fact_value=serialized,
@@ -124,6 +130,7 @@ class ProfileSyncService:
                     source=source,
                     verified=False,
                 )
+                open_facts[fact_code] = new_fact
                 summary["facts_updated"].append(fact_code)
                 await self._add_provenance(citizen_id, fact_code)
                 continue
@@ -401,6 +408,8 @@ class ProfileSyncService:
     def _read_value(self, citizen: CitizenMaster, key: str, entry: ProfileField) -> Any:
         if key in _IDENTITY_KEYS:
             return _IDENTITY_KEYS[key](citizen)
+        if entry.domain == "citizen":
+            return getattr(citizen, entry.column, None) if entry.column else None
         if entry.column is None or entry.domain not in SINGLETON_DOMAINS:
             return None
         row = getattr(citizen, f"{entry.domain}_profile", None)
@@ -410,10 +419,13 @@ class ProfileSyncService:
 
 
 def _iter_syncable_entries():
-    """All registry entries with both a fact_code and a canonical column."""
+    """All registry entries with both a fact_code and a canonical column or identity mapping, deduplicated by fact_code."""
     from app.services.profile_mapping import REGISTRY
 
+    seen_facts = set()
     syncable_domains = set(SINGLETON_DOMAINS) | {"citizen"}
     for key, entry in REGISTRY.items():
-        if entry.fact_code and entry.column and entry.domain in syncable_domains:
-            yield key, entry
+        if entry.fact_code and entry.fact_code not in seen_facts:
+            if (entry.column or key in _IDENTITY_KEYS) and entry.domain in syncable_domains:
+                seen_facts.add(entry.fact_code)
+                yield key, entry

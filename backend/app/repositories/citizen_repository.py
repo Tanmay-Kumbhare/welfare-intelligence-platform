@@ -141,17 +141,31 @@ class CitizenRepository:
             setattr(citizen, field, getattr(data, field))
         flag_modified(citizen, "profile_types")
         citizen.profile_version = (getattr(citizen, "profile_version", 1) or 1) + 1
+
+        # Guarantee sub-profiles exist
+        if citizen.demographic_profile is None:
+            citizen.demographic_profile = DemographicProfile(citizen_id=citizen.citizen_id)
+            self.db.add(citizen.demographic_profile)
+        if citizen.financial_profile is None:
+            citizen.financial_profile = FinancialProfile(citizen_id=citizen.citizen_id)
+            self.db.add(citizen.financial_profile)
+        if citizen.location_profile is None:
+            citizen.location_profile = LocationProfile(citizen_id=citizen.citizen_id)
+            self.db.add(citizen.location_profile)
+
         for profile, values in (
             (citizen.demographic_profile, data.demographic.model_dump()),
             (citizen.financial_profile, data.financial.model_dump()),
             (citizen.location_profile, data.location.model_dump()),
         ):
-            # Registration always creates all three rows. Keeping this guard
-            # makes edits resilient to a legacy incomplete record without
-            # creating a second citizen identity.
-            if profile is not None:
-                for field, value in values.items():
-                    setattr(profile, field, value)
+            for field, value in values.items():
+                setattr(profile, field, value)
+
+        if citizen.demographic_profile and citizen.demographic_profile.type_specific_metadata is not None:
+            flag_modified(citizen.demographic_profile, "type_specific_metadata")
+        if citizen.location_profile and citizen.location_profile.current_address is not None:
+            flag_modified(citizen.location_profile, "current_address")
+
         await self.db.flush()
         return citizen
 
@@ -172,32 +186,46 @@ class CitizenRepository:
             setattr(citizen, field, getattr(payload, field))
         flag_modified(citizen, "profile_types")
         citizen.profile_version = (getattr(citizen, "profile_version", 1) or 1) + 1
+
+        if citizen.demographic_profile is None:
+            citizen.demographic_profile = DemographicProfile(citizen_id=citizen.citizen_id)
+            self.db.add(citizen.demographic_profile)
+        if citizen.financial_profile is None:
+            citizen.financial_profile = FinancialProfile(citizen_id=citizen.citizen_id)
+            self.db.add(citizen.financial_profile)
+        if citizen.location_profile is None:
+            citizen.location_profile = LocationProfile(citizen_id=citizen.citizen_id)
+            self.db.add(citizen.location_profile)
+
         for profile, values in (
             (citizen.demographic_profile, payload.demographic.model_dump()),
             (citizen.financial_profile, payload.financial.model_dump()),
             (citizen.location_profile, payload.location.model_dump()),
         ):
-            if profile is not None:
-                for field, value in values.items():
-                    setattr(profile, field, value)
+            for field, value in values.items():
+                setattr(profile, field, value)
+
+        if citizen.demographic_profile and citizen.demographic_profile.type_specific_metadata is not None:
+            flag_modified(citizen.demographic_profile, "type_specific_metadata")
+        if citizen.location_profile and citizen.location_profile.current_address is not None:
+            flag_modified(citizen.location_profile, "current_address")
+
         await self.db.flush()
         return citizen
 
     async def get_full_profile(self, citizen_id: uuid.UUID) -> Optional[CitizenMaster]:
         """
-        Fetch a citizen with all sub-profiles and assessments.
+        Fetch a citizen with all sub-profiles, education records, and facts.
         Used by the eligibility engine which needs every profile field.
         """
         result = await self.db.execute(
             select(CitizenMaster)
             .where(CitizenMaster.citizen_id == citizen_id)
             .options(
-                # These are one-to-one relationships. Joining them keeps the
-                # eligibility read to one query without multiplying rows.
                 joinedload(CitizenMaster.demographic_profile),
                 joinedload(CitizenMaster.financial_profile),
                 joinedload(CitizenMaster.location_profile),
-                # Open profile facts (AGE etc.) consumed by the engine.
+                selectinload(CitizenMaster.education_records),
                 selectinload(CitizenMaster.profile_facts),
             )
         )

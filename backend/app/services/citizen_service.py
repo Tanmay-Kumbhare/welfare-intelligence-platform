@@ -29,8 +29,71 @@ from app.schemas.education import (
 )
 
 
+def compute_profile_completeness(citizen: CitizenMaster) -> tuple[str, int, list[str]]:
+    """
+    Authoritatively calculate profile completeness for welfare/scholarship eligibility.
+    Returns: (profile_status, profile_completion, missing_fields)
+    """
+    missing: list[str] = []
+    score = 0
+
+    # 1. Identity: Full Name & DOB (20 pts)
+    if citizen.full_name and citizen.date_of_birth:
+        score += 20
+    else:
+        missing.append("Date of Birth")
+
+    # 2. Gender (10 pts)
+    if citizen.gender:
+        score += 10
+    else:
+        missing.append("Gender")
+
+    # 3. Profile / Citizen Type (10 pts)
+    if citizen.citizen_type or (citizen.profile_types and len(citizen.profile_types) > 0):
+        score += 10
+    else:
+        missing.append("Profile Type")
+
+    # 4. Social Category (15 pts)
+    demo = citizen.demographic_profile
+    if demo and demo.social_category:
+        score += 15
+    else:
+        missing.append("Social Category")
+
+    # 5. Education Level / Records (15 pts)
+    has_edu_level = bool(demo and demo.education_level)
+    has_edu_records = bool(citizen.education_records and len(citizen.education_records) > 0)
+    if has_edu_level or has_edu_records:
+        score += 15
+    else:
+        missing.append("Education Details")
+
+    # 6. Annual Income (15 pts)
+    fin = citizen.financial_profile
+    if fin and fin.annual_income is not None:
+        score += 15
+    else:
+        missing.append("Annual Income")
+
+    # 7. State / Location (15 pts)
+    loc = citizen.location_profile
+    if loc and loc.state:
+        score += 15
+    else:
+        missing.append("State / Location")
+
+    # Status is COMPLETE only when all core eligibility dimensions are provided
+    core_missing = [f for f in missing if f in ("Date of Birth", "Gender", "Social Category", "Education Details", "Annual Income", "State / Location")]
+    status = "COMPLETE" if len(core_missing) == 0 else "INCOMPLETE"
+
+    return status, score, missing
+
+
 def _to_response(citizen: CitizenMaster) -> CitizenResponse:
     """Map ORM relationship names to the public citizen response fields."""
+    status, completion, missing = compute_profile_completeness(citizen)
     return CitizenResponse(
         citizen_id=citizen.citizen_id,
         full_name=citizen.full_name,
@@ -61,6 +124,9 @@ def _to_response(citizen: CitizenMaster) -> CitizenResponse:
             EducationRecordResponse.model_validate(rec)
             for rec in (citizen.education_records or [])
         ],
+        profile_status=status,
+        profile_completion=completion,
+        missing_fields=missing,
     )
 
 
@@ -104,7 +170,8 @@ class CitizenService:
         if not citizen:
             return None
         await self._sync_and_invalidate(citizen_id)
-        return _to_response(citizen)
+        fresh = await self.repo.get_by_id(citizen_id)
+        return _to_response(fresh or citizen)
 
     # ------------------------------------------------------------------
     # Education Records Operations
@@ -151,12 +218,10 @@ class CitizenService:
             await self._sync_and_invalidate(citizen_id)
         return success
 
-    async def _sync_and_invalidate(self, citizen_id: uuid.UUID) -> None:
-        """Trigger fact synchronization and Redis cache invalidation."""
+    async def _sync_and_invalidate(self, citizen_id: uuid.UUID) -> dict[str, Any]:
+        """Trigger fact synchronization and Redis cache invalidation atomically."""
         from app.services.profile_sync_service import ProfileSyncService
-        try:
-            sync_service = ProfileSyncService(self.db)
-            await sync_service.sync_facts_from_profile(citizen_id)
-        except Exception:
-            pass
+        sync_service = ProfileSyncService(self.db)
+        summary = await sync_service.sync_facts_from_profile(citizen_id)
         await invalidate_citizen(citizen_id)
+        return summary

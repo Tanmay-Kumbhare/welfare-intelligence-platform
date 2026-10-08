@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Check,
   CheckCircle2,
@@ -7,13 +7,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  FileText,
   HelpCircle,
-  Info,
   Loader2,
   RefreshCw,
   Sparkles,
-  UserCheck,
   XCircle,
   AlertTriangle,
   ArrowRight,
@@ -23,8 +20,7 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
-import { ErrorState, LoadingState, EmptyState } from "../components/ui/StatusStates";
-import RuleEvaluationDetails from "../components/eligibility/RuleEvaluationDetails";
+import { ErrorState, LoadingState } from "../components/ui/StatusStates";
 import {
   authService,
   citizenService,
@@ -88,19 +84,36 @@ function SchemeDocuments({ item }) {
           <Badge variant="excl">Action Needed ({missingCount} Pending)</Badge>
         )}
       </h4>
-      <ul className="space-y-1.5 mb-3">
-        {item.scheme_documents.map((d) => (
-          <li key={d.document_type} className="text-xs flex items-center gap-2">
-            {d.status === "VALID" ? (
-              <CheckCircle2 className="h-3.5 w-3.5 text-ok shrink-0" />
-            ) : (
-              <XCircle className="h-3.5 w-3.5 text-excl shrink-0" />
-            )}
-            <span className={d.status === "VALID" ? "text-ink" : "text-excl-ink font-medium"}>
-              {d.name} {!d.required && <span className="text-ink-soft font-normal">(Optional)</span>}
-            </span>
-          </li>
-        ))}
+      <ul className="space-y-2 mb-3">
+        {item.scheme_documents.map((d) => {
+          const isValid = d.status === "VALID";
+          const isRejected = d.status === "REJECTED";
+          return (
+            <li key={d.document_type} className="text-xs flex items-center justify-between gap-2 p-1.5 rounded bg-surface/50 border border-line/60">
+              <div className="flex items-center gap-2">
+                {isValid ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-ok shrink-0" />
+                ) : isRejected ? (
+                  <XCircle className="h-3.5 w-3.5 text-excl shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                )}
+                <span className="text-ink font-medium">
+                  {d.name} {!d.required && <span className="text-ink-soft font-normal text-[11px]">(Optional)</span>}
+                </span>
+              </div>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                isValid
+                  ? "bg-ok-soft/30 text-ok-ink border-ok-soft"
+                  : isRejected
+                  ? "bg-excl-soft/30 text-excl-ink border-excl-soft"
+                  : "bg-amber-500/15 text-amber-700 border-amber-300"
+              }`}>
+                {isValid ? "✓ Verified" : isRejected ? "✕ Rejected" : "⚠ Pending"}
+              </span>
+            </li>
+          );
+        })}
       </ul>
       <Button to="/documents" variant="secondary" size="sm">
         {missingCount > 0 ? "Upload Missing Documents" : "View Documents"}
@@ -109,36 +122,33 @@ function SchemeDocuments({ item }) {
   );
 }
 
-function SatisfiedRulesList({ details }) {
-  if (!details || !Array.isArray(details.groups)) return null;
+function MatchScoreBadge({ score, label = "Rule Match Score" }) {
+  if (score === null || score === undefined) return null;
+  const numScore = Math.round(Number(score));
 
-  const passedRules = [];
-  details.groups.forEach((group) => {
-    if (Array.isArray(group.rules)) {
-      group.rules.forEach((r) => {
-        if (r && r.passed) {
-          passedRules.push(r.description || `${r.parameter.replace(/_/g, " ")} requirement satisfied`);
-        }
-      });
-    }
-  });
+  const isHigh = numScore >= 90;
+  const isMed = numScore >= 70 && numScore < 90;
 
-  if (passedRules.length === 0) return null;
+  const barClasses = isHigh ? "bg-ok" : isMed ? "bg-amber-500" : "bg-ink-soft";
+  const textClasses = isHigh ? "text-ok-ink font-bold" : isMed ? "text-amber-700 font-bold" : "text-ink font-semibold";
 
   return (
-    <div className="mt-3.5 pt-3 border-t border-line/60">
-      <p className="text-xs font-semibold text-ink-soft mb-2 uppercase tracking-wider">Satisfied Criteria:</p>
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-ink">
-        {passedRules.map((desc, idx) => (
-          <li key={idx} className="flex items-start gap-1.5">
-            <Check className="h-3.5 w-3.5 text-ok shrink-0 mt-0.5" />
-            <span>{desc}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="my-2.5 p-2.5 rounded-lg bg-surface-soft/60 border border-line">
+      <div className="flex items-center justify-between text-xs font-medium mb-1.5">
+        <span className="text-ink font-semibold">{label}</span>
+        <span className={textClasses}>{numScore}%</span>
+      </div>
+      <div className="w-full bg-line/80 h-2 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${barClasses}`}
+          style={{ width: `${Math.min(Math.max(numScore, 0), 100)}%` }}
+        />
+      </div>
     </div>
   );
 }
+
+
 
 export default function CheckEligibilityPage() {
   const navigate = useNavigate();
@@ -166,41 +176,42 @@ export default function CheckEligibilityPage() {
   const [fieldErrors, setFieldErrors] = useState(() => new Map());
   const [loadKey, setLoadKey] = useState(0);
 
-  // Guest registration form state
-  const [regForm, setRegForm] = useState({ full_name: "", date_of_birth: "", gender: "" });
-  const [regError, setRegError] = useState("");
-
   const answersRef = useRef(answers);
   answersRef.current = answers;
   const submissionInFlight = useRef(false);
 
-  // 1. Initial Load: Authenticated Citizen & Form Definition
+  // 1. Initial Load: Authenticated User, Citizen & Form Definition
   useEffect(() => {
     let cancelled = false;
 
     const loadData = async () => {
       let resolvedCitizen = null;
+      let isAuthenticated = false;
+
       try {
         const me = await authService.me();
-        const cid = me.data?.citizen_id;
-        if (cid) {
-          const res = await citizenService.get(cid);
-          resolvedCitizen = res.data;
+        if (me?.data) {
+          isAuthenticated = true;
+          const cid = me.data.citizen_id;
+          if (cid) {
+            const res = await citizenService.get(cid);
+            resolvedCitizen = res.data;
+          }
         }
       } catch {
-        // Not authenticated, fallback to local storage
+        isAuthenticated = false;
+      }
+
+      if (cancelled) return;
+
+      if (!isAuthenticated) {
+        setPhase("unauthenticated");
+        return;
       }
 
       if (!resolvedCitizen) {
-        const stored = getStoredCitizenId();
-        if (stored) {
-          try {
-            const res = await citizenService.get(stored);
-            resolvedCitizen = res.data;
-          } catch {
-            clearStoredCitizenId();
-          }
-        }
+        setPhase("incomplete-profile");
+        return;
       }
 
       let formDef = null;
@@ -213,17 +224,15 @@ export default function CheckEligibilityPage() {
 
       if (cancelled) return;
 
-      if (resolvedCitizen) {
-        setCitizen(resolvedCitizen);
-        if (formDef) setForm(formDef);
-        if (modeParam === "form") {
-          setPhase("form");
-        } else {
-          setPhase("ready");
-        }
+      setCitizen(resolvedCitizen);
+      if (formDef) setForm(formDef);
+
+      if (resolvedCitizen.profile_status !== "COMPLETE") {
+        setPhase("incomplete-profile");
+      } else if (modeParam === "form") {
+        setPhase("form");
       } else {
-        if (formDef) setForm(formDef);
-        setPhase("no-citizen");
+        setPhase("ready");
       }
     };
 
@@ -238,7 +247,7 @@ export default function CheckEligibilityPage() {
 
   // 2. Perform Scheme Eligibility Evaluation on user action
   const runEligibilityCheck = useCallback(async () => {
-    if (!citizen?.citizen_id) return;
+    if (!citizen?.citizen_id || citizen.profile_status !== "COMPLETE") return;
     setEvaluating(true);
     setMessage("");
 
@@ -252,41 +261,12 @@ export default function CheckEligibilityPage() {
       setPhase("results");
     } catch (err) {
       console.error("Eligibility check failed:", err);
-      setMessage("Unable to complete eligibility check. Please try again.");
+      const errMsg = err.response?.data?.detail?.message || "Unable to complete eligibility check. Please try again.";
+      setMessage(errMsg);
     } finally {
       setEvaluating(false);
     }
   }, [citizen]);
-
-  // 3. Guest Registration Handler
-  const registerGuest = useCallback(
-    async (event) => {
-      event.preventDefault();
-      setRegError("");
-      if (regForm.full_name.trim().length < 2 || !regForm.date_of_birth || regForm.date_of_birth >= TODAY) {
-        setRegError("Please enter your full name and a valid date of birth in the past.");
-        return;
-      }
-      try {
-        const response = await citizenService.register({
-          full_name: regForm.full_name.trim(),
-          date_of_birth: regForm.date_of_birth,
-          gender: regForm.gender || null,
-          citizen_type: "GENERAL",
-          demographic: { disability_status: "NONE" },
-          financial: { is_bpl_card_holder: false, is_income_tax_payer: false },
-          location: {},
-        });
-        const cid = response.data.citizen_id;
-        setStoredCitizenId(cid);
-        setCitizen(response.data);
-        setPhase("ready");
-      } catch {
-        setRegError("Unable to create profile right now. Please try again.");
-      }
-    },
-    [regForm]
-  );
 
   // 4. Form Evaluation & Submission Helpers for questionnaire mode
   const ensureSubmission = useCallback(async () => {
@@ -393,59 +373,80 @@ export default function CheckEligibilityPage() {
     );
   }
 
-  // 1. Guest View (Profile registration before checking)
-  if (phase === "no-citizen") {
+  // 1. Unauthenticated View (Login / Register Gate)
+  if (phase === "unauthenticated") {
     return (
-      <div className="max-w-2xl mx-auto py-6">
-        <div className="mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-soft/30 text-brand rounded-full text-xs font-semibold mb-3">
-            <Sparkles className="h-3.5 w-3.5" /> VidyaSetu Eligibility Portal
+      <div className="max-w-xl mx-auto py-12 text-center">
+        <Card className="p-8 space-y-4">
+          <div className="h-14 w-14 rounded-full bg-brand-soft/30 text-brand flex items-center justify-center mx-auto mb-2">
+            <Sparkles className="h-7 w-7" />
           </div>
-          <h1 className="text-3xl font-bold text-ink mb-2">Check Your Welfare Eligibility</h1>
+          <h1 className="text-2xl font-bold text-ink">Check Your Eligibility</h1>
+          <p className="text-sm text-ink-soft max-w-md mx-auto leading-relaxed">
+            Sign in to securely check which welfare schemes and scholarships you qualify for based on your canonical citizen profile.
+          </p>
+          <div className="pt-4 flex justify-center">
+            <Button to="/login" variant="primary" size="lg" className="px-8">
+              Login / Register
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // 2. Incomplete Profile View (Profile Completeness Gate)
+  if (phase === "incomplete-profile" || (citizen && citizen.profile_status !== "COMPLETE")) {
+    const missing = citizen?.missing_fields?.length
+      ? citizen.missing_fields
+      : ["Education Details", "Annual Income", "Social Category", "State / Location"];
+    const completionRate = citizen?.profile_completion || 0;
+
+    return (
+      <div className="max-w-2xl mx-auto py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-ink mb-1">Complete Your Profile</h1>
           <p className="text-ink-soft text-sm">
-            Enter your basic details below to instantly evaluate your eligibility across all active government schemes.
+            Add your education, income, category, and location details so we can accurately evaluate scheme eligibility.
           </p>
         </div>
-        <Card className="p-6">
-          <form onSubmit={registerGuest} noValidate>
-            <div className="grid md:grid-cols-2 gap-4">
-              <Input
-                id="reg-name"
-                label="Full Name"
-                required
-                value={regForm.full_name}
-                autoComplete="name"
-                placeholder="As per official ID"
-                onChange={(e) => setRegForm((c) => ({ ...c, full_name: e.target.value }))}
-              />
-              <Input
-                id="reg-dob"
-                label="Date of Birth"
-                required
-                type="date"
-                max={TODAY}
-                value={regForm.date_of_birth}
-                error={regError || undefined}
-                onChange={(e) => setRegForm((c) => ({ ...c, date_of_birth: e.target.value }))}
-              />
-              <Select
-                id="reg-gender"
-                label="Gender"
-                value={regForm.gender}
-                onChange={(e) => setRegForm((c) => ({ ...c, gender: e.target.value }))}
-              >
-                <option value="">Select Gender</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
-              </Select>
+
+        <Card className="p-6 border-l-4 border-l-amber-500">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-ink">Profile Completion</span>
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-300">
+                {completionRate}%
+              </span>
             </div>
-            <div className="flex justify-end mt-6 pt-4 border-t border-line">
-              <Button type="submit" variant="primary">
-                Continue to Eligibility Check <ChevronRight className="h-4 w-4 ml-1" />
+
+            <div className="w-full bg-line/80 h-2.5 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                style={{ width: `${Math.min(Math.max(completionRate, 0), 100)}%` }}
+              />
+            </div>
+
+            <div className="bg-surface-soft p-4 rounded-lg border border-line space-y-2">
+              <p className="text-xs font-semibold text-ink-soft uppercase tracking-wider">
+                Required for Scheme Eligibility:
+              </p>
+              <ul className="space-y-1.5 text-xs text-ink">
+                {missing.map((field, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span>{field}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between gap-3">
+              <Button to="/profile" variant="primary" size="md">
+                Complete My Profile <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
-          </form>
+          </div>
         </Card>
       </div>
     );
@@ -645,11 +646,16 @@ export default function CheckEligibilityPage() {
               </div>
 
               <div className="space-y-4">
-                {eligibleSchemes.map((item) => (
+                {eligibleSchemes.map((item, index) => (
                   <Card key={item.scheme.scheme_id} eligible className="p-5">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-bold text-ink mb-1">{item.scheme.scheme_name}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-brand bg-brand-soft/20 px-2 py-0.5 rounded border border-brand/20">
+                            #{index + 1}
+                          </span>
+                          <h3 className="text-lg font-bold text-ink">{item.scheme.scheme_name}</h3>
+                        </div>
                         <SchemeMeta scheme={item.scheme} />
                       </div>
                       <Button to={`/schemes/${item.scheme.scheme_id}`} variant="primary" size="sm">
@@ -663,8 +669,8 @@ export default function CheckEligibilityPage() {
                       </p>
                     )}
 
-                    {/* Satisfied Criteria Checklist */}
-                    <SatisfiedRulesList details={item.evaluation_details} />
+                    {/* Eligibility Match Score */}
+                    <MatchScoreBadge score={item.match_score} />
 
                     {/* Required Documents Section */}
                     <SchemeDocuments item={item} />
@@ -713,22 +719,35 @@ export default function CheckEligibilityPage() {
 
               {showNonMatching && (
                 <div className="mt-3 space-y-3">
-                  {ineligibleSchemes.map((item) => (
-                    <Card key={item.scheme.scheme_id} className="p-4 bg-surface/60">
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                        <div>
-                          <h4 className="text-sm font-semibold text-ink">{item.scheme.scheme_name}</h4>
-                          <span className="text-xs text-ink-soft">{item.scheme.department_name}</span>
+                  {ineligibleSchemes.map((item) => {
+                    const numScore =
+                      item.match_score !== null && item.match_score !== undefined
+                        ? Math.round(Number(item.match_score))
+                        : null;
+                    return (
+                      <Card key={item.scheme.scheme_id} className="p-4 bg-surface/60">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <h4 className="text-sm font-semibold text-ink">{item.scheme.scheme_name}</h4>
+                              {numScore !== null && (
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-surface-soft text-ink-soft border border-line">
+                                  {numScore}% Match
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-ink-soft">{item.scheme.department_name}</span>
+                          </div>
+                          <Button to={`/schemes/${item.scheme.scheme_id}`} variant="ghost" size="sm">
+                            View Details
+                          </Button>
                         </div>
-                        <Button to={`/schemes/${item.scheme.scheme_id}`} variant="ghost" size="sm">
-                          View Details
-                        </Button>
-                      </div>
-                      <p className="text-xs text-excl-ink font-medium mt-2 mb-0">
-                        Reason: {item.reason || "Eligibility conditions were not satisfied."}
-                      </p>
-                    </Card>
-                  ))}
+                        <p className="text-xs text-excl-ink font-medium mt-2 mb-0">
+                          Reason: {item.reason || "Eligibility conditions were not satisfied."}
+                        </p>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>

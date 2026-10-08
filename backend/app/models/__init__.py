@@ -32,6 +32,7 @@ from app.models.domain_profile import (
     EmploymentProfile,
     FamilyMember,
 )
+from app.models.education_record import EducationRecord
 # Phase 1: scheme sources and ingestion infrastructure
 from app.models.scheme_source import (
     CONTENT_TYPES,
@@ -77,6 +78,7 @@ __all__ = [
     "FACT_SOURCES",
     # Phase 1: domain profiles
     "EducationProfile",
+    "EducationRecord",
     "EmploymentProfile",
     "FamilyMember",
     "AgricultureProfile",

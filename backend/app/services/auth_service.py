@@ -255,10 +255,15 @@ class AuthService:
             await self.users.db.flush()
             raise SessionExpiredError()
         await self.users.refresh_session_last_used(session)
-        user = await self.users.get_by_id(session.user_id)
+        user = session.user if getattr(session, "user", None) is not None else await self.users.get_by_id(session.user_id)
         if user is None:
             raise UnauthorizedError()
         return user
+
+    async def get_roles_for_user(self, user: UserAccount) -> list[str]:
+        if hasattr(user, "roles") and user.roles is not None:
+            return [r.role for r in user.roles]
+        return await self.users.get_roles(user.user_id)
 
     async def get_citizen_for_user(self, user: UserAccount) -> CitizenMaster | None:
         return await self.citizens.get_by_owning_user(user.user_id)

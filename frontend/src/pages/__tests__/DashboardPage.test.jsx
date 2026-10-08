@@ -119,14 +119,13 @@ describe('DashboardPage', () => {
       expect(screen.getByText(/Profile Complete/i)).toBeInTheDocument();
       
       // Domains
-      expect(screen.getByText(/STUDENT/i)).toBeInTheDocument();
-      expect(screen.getByText(/FARMER/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/STUDENT/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/FARMER/i).length).toBeGreaterThan(0);
       
       // Eligibility
       expect(screen.getByText('5')).toBeInTheDocument(); // Eligible count
       expect(screen.getByText('2')).toBeInTheDocument(); // Ineligible count
       
-      // Documents
       expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(3); // Valid, Invalid, Not Uploaded
       
       // Missing Docs list

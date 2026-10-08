@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_authenticated_user, get_optional_user, require_same_citizen
@@ -45,6 +45,7 @@ router = APIRouter()
 
 @router.get("/", response_model=List[FormSummary], summary="List active forms")
 async def list_forms(
+    response: Response,
     target_citizen_type: Optional[str] = Query(
         None,
         description="Filter forms by target citizen type (e.g. GENERAL, STUDENT, FARMER).",
@@ -52,6 +53,7 @@ async def list_forms(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Available ACTIVE forms, latest version per form_code."""
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
     service = FormService(FormRepository(db))
     return await service.list_active_forms(target_citizen_type)
 
@@ -116,9 +118,11 @@ async def get_form_version(
 )
 async def get_form(
     form_code: str,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Full hierarchy: sections → questions → options/conditions."""
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
     service = FormService(FormRepository(db))
     try:
         return await service.get_active_form(form_code)
@@ -286,7 +290,7 @@ async def normalize_submission(
     # Normalization wrote canonical profile columns — the short-TTL citizen
     # read cache must not serve the pre-normalization profile afterwards.
     # (Hook lives here because normalization_service is intentionally frozen.)
-    invalidate_citizen(data.citizen_id)
+    await invalidate_citizen(data.citizen_id)
     return summary
 
 

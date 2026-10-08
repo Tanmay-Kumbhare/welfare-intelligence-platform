@@ -9,6 +9,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.schemas.education import EducationRecordResponse
+
 
 # ------------------------------------------------------------------
 # Sub-schemas
@@ -35,10 +37,15 @@ class FinancialProfileCreate(BaseModel):
 
 
 class LocationProfileCreate(BaseModel):
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
     state: Optional[str] = None
     district: Optional[str] = None
     village_city: Optional[str] = None
+    pincode: Optional[str] = None
     area_type: Optional[str] = None
+    same_as_permanent: bool = True
+    current_address: Optional[dict[str, Any]] = None
 
 
 # ------------------------------------------------------------------
@@ -150,10 +157,15 @@ class FinancialProfileResponse(BaseModel):
 class LocationProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     location_id: uuid.UUID
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
     state: Optional[str] = None
     district: Optional[str] = None
     village_city: Optional[str] = None
+    pincode: Optional[str] = None
     area_type: Optional[str] = None
+    same_as_permanent: bool = True
+    current_address: Optional[dict[str, Any]] = None
 
 
 class CitizenResponse(BaseModel):
@@ -167,10 +179,14 @@ class CitizenResponse(BaseModel):
     citizen_type: str
     profile_types: list[str] = []
     registration_date: Optional[date] = None
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
+    profile_version: int = 1
     verification_status: str
     demographic: Optional[DemographicProfileResponse] = None
     financial: Optional[FinancialProfileResponse] = None
     location: Optional[LocationProfileResponse] = None
+    education_records: list[EducationRecordResponse] = []
 
 
 class FactSyncSummary(BaseModel):

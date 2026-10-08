@@ -2,11 +2,47 @@
 
 An AI-based welfare scheme eligibility and citizen benefit matching engine.
 
+## Windows Quick Start (One-Click)
+
+1. Make sure required system dependencies are installed (**Python 3.11+** and **Node.js 18+**).
+2. Configure `backend/.env` if using a custom database or OAuth keys (defaults to the provided Supabase/PostgreSQL instance or local Docker).
+3. Double-click `run.bat` (or run `./run.bat` in a terminal).
+4. The launcher will automatically check dependencies, set up virtual environments, install packages, run migrations, seed data, start backend and frontend, and open the application in your default browser.
+
+- **Default Frontend URL**: [http://localhost:5173](http://localhost:5173)
+- **Default Backend URL**: [http://localhost:8000](http://localhost:8000)
+- **Interactive API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+
+---
+
 ## Prerequisites
 
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL — either a local Docker container **or** a [Supabase](https://supabase.com) project
+- **Python 3.11+** (must be added to PATH)
+- **Node.js 18+** and **npm**
+- **PostgreSQL** — either a local Docker container (`docker-compose up -d`) **or** a [Supabase](https://supabase.com) project
+
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+- `DATABASE_URL`: PostgreSQL connection string (supports `postgresql://` or `postgresql+asyncpg://`).
+- `APP_ENV`: `development` or `production`.
+- `CORS_ORIGINS`: Comma-separated list of allowed origins (e.g. `http://localhost:3000,http://localhost:5173`).
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: (Optional) Google OAuth credentials.
+- `DIGILOCKER_CLIENT_ID`, `DIGILOCKER_CLIENT_SECRET`: (Optional) DigiLocker OAuth credentials.
+
+### Frontend (`frontend/.env`)
+- `VITE_API_URL`: Backend API endpoint (e.g. `http://localhost:8000/api/v1`).
+
+---
+
+## Common Startup Errors & Troubleshooting
+
+- **`psycopg2` / DB driver error**: The app uses `asyncpg` for async SQLAlchemy. Ensure `DATABASE_URL` is properly formatted (automatically normalized in `app/config.py`).
+- **Port conflicts**: Make sure ports `8000` (FastAPI) and `5173` (Vite) are not occupied by other processes.
+- **Python not found**: Ensure Python 3.11+ is installed and "Add Python to PATH" was selected during installation.
 
 ---
 

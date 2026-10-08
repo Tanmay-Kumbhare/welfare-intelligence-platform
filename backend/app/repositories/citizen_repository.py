@@ -90,29 +90,32 @@ class CitizenRepository:
         return citizen
 
     async def get_by_owning_user(self, user_id: uuid.UUID) -> CitizenMaster | None:
-        """Fetch the citizen profile owned by an authenticated user."""
+        """Fetch the citizen profile owned by an authenticated user in a single joined query."""
         result = await self.db.execute(
             select(CitizenMaster)
             .where(CitizenMaster.owning_user_id == user_id)
             .options(
-                selectinload(CitizenMaster.demographic_profile),
-                selectinload(CitizenMaster.financial_profile),
-                selectinload(CitizenMaster.location_profile),
+                joinedload(CitizenMaster.demographic_profile),
+                joinedload(CitizenMaster.financial_profile),
+                joinedload(CitizenMaster.location_profile),
+                selectinload(CitizenMaster.education_records),
             )
             .limit(1)
         )
         return result.scalar_one_or_none()
 
     async def get_by_id(self, citizen_id: uuid.UUID) -> Optional[CitizenMaster]:
-        """Fetch a citizen with all sub-profiles eagerly loaded."""
+        """Fetch a citizen with all sub-profiles eagerly loaded via single joined query."""
         result = await self.db.execute(
             select(CitizenMaster)
             .where(CitizenMaster.citizen_id == citizen_id)
             .options(
-                selectinload(CitizenMaster.demographic_profile),
-                selectinload(CitizenMaster.financial_profile),
-                selectinload(CitizenMaster.location_profile),
+                joinedload(CitizenMaster.demographic_profile),
+                joinedload(CitizenMaster.financial_profile),
+                joinedload(CitizenMaster.location_profile),
+                selectinload(CitizenMaster.education_records),
             )
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -131,14 +134,13 @@ class CitizenRepository:
         citizen = await self.get_by_id(citizen_id)
         if citizen is None:
             return None
-        print("DEBUG REPO UPDATE PAYLOAD:", data.profile_types)
         for field in (
             "full_name", "date_of_birth", "gender", "mobile_number",
             "email_id", "citizen_type", "profile_types",
         ):
             setattr(citizen, field, getattr(data, field))
         flag_modified(citizen, "profile_types")
-        print("DEBUG REPO UPDATE CITIZEN:", citizen.profile_types)
+        citizen.profile_version = (getattr(citizen, "profile_version", 1) or 1) + 1
         for profile, values in (
             (citizen.demographic_profile, data.demographic.model_dump()),
             (citizen.financial_profile, data.financial.model_dump()),
@@ -163,14 +165,13 @@ class CitizenRepository:
         if citizen is None:
             return None
         payload = CitizenUpdate.model_validate(data)
-        print("DEBUG REPO PAYLOAD:", payload.profile_types)
         for field in (
             "full_name", "date_of_birth", "gender", "mobile_number",
             "email_id", "citizen_type", "profile_types",
         ):
             setattr(citizen, field, getattr(payload, field))
         flag_modified(citizen, "profile_types")
-        print("DEBUG REPO CITIZEN:", citizen.profile_types)
+        citizen.profile_version = (getattr(citizen, "profile_version", 1) or 1) + 1
         for profile, values in (
             (citizen.demographic_profile, payload.demographic.model_dump()),
             (citizen.financial_profile, payload.financial.model_dump()),

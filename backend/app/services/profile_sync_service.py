@@ -145,11 +145,100 @@ class ProfileSyncService:
                     summary["facts_updated"].append(fact_code)
                 await self._add_provenance(citizen_id, fact_code)
 
+        # Synchronize repeatable education facts
+        await self._sync_education_facts(citizen, summary)
+
         await self._rerun_derivations(citizen_id, summary)
         await self.db.flush()
         summary["facts_updated"] = sorted(set(summary["facts_updated"]))
         summary["skipped_verified"] = sorted(set(summary["skipped_verified"]))
         return summary
+
+    async def _sync_education_facts(self, citizen: CitizenMaster, summary: dict[str, Any]) -> None:
+        """Derive and synchronize facts from repeatable education records."""
+        records = citizen.education_records or []
+        if not records:
+            return
+
+        level_weights = {
+            "PHD": 70,
+            "POSTGRADUATE": 60,
+            "UNDERGRADUATE": 50,
+            "DIPLOMA": 40,
+            "ITI": 30,
+            "12TH_HSC": 20,
+            "10TH_SSC": 10,
+            "OTHER": 5,
+        }
+
+        # 1. Determine highest education level
+        highest_rec = max(records, key=lambda r: level_weights.get(r.level.upper(), 0))
+        highest_level = highest_rec.level.upper()
+        await self._set_or_update_fact(citizen.citizen_id, "EDUCATION_LEVEL", highest_level, "STRING", summary)
+        await self._set_or_update_fact(citizen.citizen_id, "HIGHEST_EDUCATION_LEVEL", highest_level, "STRING", summary)
+
+        # Backward compatibility with demographic_profile
+        if citizen.demographic_profile is not None:
+            citizen.demographic_profile.education_level = highest_level
+
+        # 2. 10th / SSC percentage
+        ssc_rec = next((r for r in records if "10" in r.level.upper() or "SSC" in r.level.upper()), None)
+        if ssc_rec and ssc_rec.percentage is not None:
+            await self._set_or_update_fact(citizen.citizen_id, "TENTH_PERCENTAGE", str(float(ssc_rec.percentage)), "DECIMAL", summary)
+
+        # 3. 12th / HSC percentage
+        hsc_rec = next((r for r in records if "12" in r.level.upper() or "HSC" in r.level.upper()), None)
+        if hsc_rec and hsc_rec.percentage is not None:
+            await self._set_or_update_fact(citizen.citizen_id, "TWELFTH_PERCENTAGE", str(float(hsc_rec.percentage)), "DECIMAL", summary)
+
+        # 4. Current education facts
+        curr_rec = next((r for r in records if r.is_current), None) or highest_rec
+        if curr_rec:
+            await self._set_or_update_fact(citizen.citizen_id, "CURRENT_EDUCATION_LEVEL", curr_rec.level, "STRING", summary)
+            details = curr_rec.details or {}
+            degree = details.get("degree") or details.get("course_name") or details.get("course_trade")
+            if degree:
+                await self._set_or_update_fact(citizen.citizen_id, "CURRENT_DEGREE", str(degree), "STRING", summary)
+            branch = details.get("branch") or details.get("stream") or details.get("specialization")
+            if branch:
+                await self._set_or_update_fact(citizen.citizen_id, "CURRENT_BRANCH", str(branch), "STRING", summary)
+            curr_year = details.get("current_year") or details.get("year_of_study")
+            if curr_year:
+                await self._set_or_update_fact(citizen.citizen_id, "CURRENT_YEAR", str(curr_year), "STRING", summary)
+            semester = details.get("current_semester")
+            if semester:
+                await self._set_or_update_fact(citizen.citizen_id, "CURRENT_SEMESTER", str(semester), "STRING", summary)
+            if curr_rec.percentage is not None:
+                await self._set_or_update_fact(citizen.citizen_id, "GRADUATION_PERCENTAGE", str(float(curr_rec.percentage)), "DECIMAL", summary)
+            cgpa = details.get("cgpa")
+            if cgpa is not None:
+                await self._set_or_update_fact(citizen.citizen_id, "GRADUATION_CGPA", str(cgpa), "DECIMAL", summary)
+
+    async def _set_or_update_fact(
+        self,
+        citizen_id: uuid.UUID,
+        fact_code: str,
+        value: str,
+        data_type: str,
+        summary: dict[str, Any],
+    ) -> None:
+        """Helper to create or update an open fact."""
+        existing = await self.profiles.get_open_fact(citizen_id, fact_code)
+        if existing is None:
+            await self.profiles.create_fact(
+                citizen_id=citizen_id,
+                fact_code=fact_code,
+                fact_value=value,
+                data_type=data_type,
+                source="USER_INPUT",
+                verified=False,
+            )
+            summary["facts_updated"].append(fact_code)
+        elif existing.fact_value != value and not existing.verified:
+            existing.fact_value = value
+            existing.data_type = data_type
+            if fact_code not in summary["facts_updated"]:
+                summary["facts_updated"].append(fact_code)
 
     async def _rerun_derivations(self, citizen_id: uuid.UUID, summary: dict[str, Any]) -> None:
         """Re-apply DERIVATION_RULES so chained facts track their sources —
@@ -296,6 +385,7 @@ class ProfileSyncService:
                 selectinload(CitizenMaster.demographic_profile),
                 selectinload(CitizenMaster.financial_profile),
                 selectinload(CitizenMaster.location_profile),
+                selectinload(CitizenMaster.education_records),
             )
             .where(CitizenMaster.citizen_id == citizen_id)
         )

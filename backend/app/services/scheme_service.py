@@ -1,4 +1,4 @@
-﻿"""
+"""
 Scheme service — orchestrates scheme operations.
 
 Read paths are served through the reference-data TTL cache: the scheme
@@ -34,26 +34,29 @@ class SchemeService:
         self.repo = SchemeRepository(db)
 
     async def get_all_schemes(self) -> Sequence[SchemeMaster | SchemeResponse]:
-        cached = cache.get(schemes_all_key())
+        cached = await cache.get(schemes_all_key())
         if cached is not None:
             return cached
 
         schemes = await self.repo.get_all_active()
-        serialized = [SchemeResponse.model_validate(s).model_dump() for s in schemes]
-        cache.set(schemes_all_key(), serialized)
+        serialized = [SchemeResponse.model_validate(s).model_dump(mode="json") for s in schemes]
+        await cache.set(schemes_all_key(), serialized, ttl=300)
         return serialized
 
     async def get_scheme(
         self, scheme_id: uuid.UUID
     ) -> SchemeMaster | SchemeDetailResponse | None:
-        cached = cache.get(scheme_detail_key(scheme_id))
+        cached = await cache.get(scheme_detail_key(scheme_id))
         if cached is not None:
             return cached
 
         scheme = await self.repo.get_by_id(scheme_id)
         if scheme is not None:
-            cache.set(
+            serialized = SchemeDetailResponse.model_validate(scheme).model_dump(mode="json")
+            await cache.set(
                 scheme_detail_key(scheme_id),
-                SchemeDetailResponse.model_validate(scheme).model_dump(),
+                serialized,
+                ttl=300,
             )
-        return scheme
+            return serialized
+        return None

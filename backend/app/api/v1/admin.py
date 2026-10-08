@@ -288,7 +288,7 @@ async def admin_update_scheme(
 
     await db.flush()
     # The scheme catalogue/detail served to citizens changed.
-    invalidate_schemes()
+    await invalidate_schemes()
 
     rule_count_result = await db.execute(
         select(func.count())
@@ -963,24 +963,69 @@ async def admin_verify_rule_provenance(
 
 
 # ------------------------------------------------------------------
+# Form Question Configuration (Placeholders & Field Metadata)
+# ------------------------------------------------------------------
+
+
+class FormQuestionConfigUpdate(BaseModel):
+    question_text: str | None = None
+    placeholder: str | None = None
+    help_text: str | None = None
+    required: bool | None = None
+
+
+@router.patch("/forms/questions/{question_id}")
+async def admin_update_form_question(
+    question_id: uuid.UUID,
+    data: FormQuestionConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Configure a question's label, placeholder, help_text, or required flag."""
+    res = await db.execute(
+        select(FormQuestion).where(FormQuestion.question_id == question_id)
+    )
+    question = res.scalar_one_or_none()
+    if not question:
+        raise HTTPException(status_code=404, detail="Form question not found")
+
+    update_dict = data.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(question, field, value)
+
+    await db.commit()
+    await db.refresh(question)
+    await invalidate_form()
+
+    return {
+        "question_id": question.question_id,
+        "question_code": question.question_code,
+        "question_text": question.question_text,
+        "placeholder": question.placeholder,
+        "help_text": question.help_text,
+        "required": question.required,
+    }
+
+
+# ------------------------------------------------------------------
 # Reference-data cache ops
 # ------------------------------------------------------------------
 
 
 @router.get("/cache/stats")
 async def admin_cache_stats() -> Any:
-    """Hit/miss/entries snapshot of the reference-data TTL cache."""
-    return cache.stats()
+    """Hit/miss/entries snapshot of the Redis reference-data cache."""
+    return await cache.stats()
 
 
 @router.post("/cache/clear")
 async def admin_cache_clear() -> Any:
     """Drop all cached reference data (schemes, forms). Next reads repopulate
     from PostgreSQL. Use after out-of-band data changes or for debugging."""
-    schemes_removed = invalidate_schemes()
-    forms_removed = invalidate_form()
+    schemes_removed = await invalidate_schemes()
+    forms_removed = await invalidate_form()
     return {
         "cleared": True,
         "schemes_keys_removed": schemes_removed,
         "forms_keys_removed": forms_removed,
     }
+

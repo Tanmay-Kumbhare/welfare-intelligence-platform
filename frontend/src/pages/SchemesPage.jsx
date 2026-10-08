@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, SlidersHorizontal } from "lucide-react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -16,13 +16,23 @@ import {
 import { categoryLabel } from "../utils/ruleFormat";
 
 export default function SchemesPage() {
+  const [searchParams] = useSearchParams();
   const [schemes, setSchemes] = useState([]);
   const [details, setDetails] = useState(new Map());
   const [status, setStatus] = useState("loading");
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
-  const [discovery, setDiscovery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("search") || "");
+  const [category, setCategory] = useState(searchParams.get("category") || "");
+  const [discovery, setDiscovery] = useState(searchParams.get("discovery") || "");
   const [sort, setSort] = useState("name");
+
+  useEffect(() => {
+    const urlDiscovery = searchParams.get("discovery");
+    if (urlDiscovery !== null) setDiscovery(urlDiscovery);
+    const urlCategory = searchParams.get("category");
+    if (urlCategory !== null) setCategory(urlCategory);
+    const urlSearch = searchParams.get("search");
+    if (urlSearch !== null) setQuery(urlSearch);
+  }, [searchParams]);
 
   const loadSchemes = () => {
     Promise.resolve(schemeService.getAll())

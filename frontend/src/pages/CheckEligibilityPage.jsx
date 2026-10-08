@@ -1,491 +1,449 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import {
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  FileText,
+  HelpCircle,
+  Info,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  UserCheck,
+  XCircle,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react";
+import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
-import { ErrorState, LoadingState } from "../components/ui/StatusStates";
-import { authService, citizenService, eligibilityService, formService, formSubmissionService } from "../services/api";
+import { ErrorState, LoadingState, EmptyState } from "../components/ui/StatusStates";
+import RuleEvaluationDetails from "../components/eligibility/RuleEvaluationDetails";
+import {
+  authService,
+  citizenService,
+  eligibilityService,
+  formService,
+  formSubmissionService,
+  recommendationService,
+} from "../services/api";
 import { clearStoredCitizenId, getStoredCitizenId, setStoredCitizenId } from "../utils/citizenStorage";
 import FormSection from "../components/forms/FormSection";
 import FormProgress from "../components/forms/FormProgress";
-import ReviewStep from "../components/forms/ReviewStep";
 import {
   computeApplicableMap,
   computeProgress,
   storedAnswersByQuestionId,
   percentage,
-  backendErrorMessage,
 } from "../components/forms/formLogic";
+import { categoryLabel } from "../utils/ruleFormat";
 
 const FORM_CODE = "GENERAL_CITIZEN_PROFILE";
 const TODAY = new Date().toISOString().slice(0, 10);
 
-function answersPayload(answersMap) {
-  return [...answersMap.entries()]
-    .filter(([, value]) => value !== null && value !== undefined)
-    .map(([question_id, value]) => ({ question_id, value, source: "USER_INPUT" }));
+function formatTimestamp(ts) {
+  if (!ts) return "Just now";
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return String(ts);
+  }
+}
+
+function SchemeMeta({ scheme }) {
+  if (!scheme) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+      {scheme.department_name && <span className="font-medium text-ink">{scheme.department_name}</span>}
+      {scheme.scheme_category && <Badge variant="neutral">{categoryLabel(scheme.scheme_category)}</Badge>}
+      <Badge variant={scheme.status === "ACTIVE" ? "ok" : "excl"}>{scheme.status}</Badge>
+    </div>
+  );
+}
+
+function SchemeDocuments({ item }) {
+  if (!item?.scheme_documents || item.scheme_documents.length === 0) return null;
+  const missingCount = item.scheme_documents.filter((d) => d.required && d.status !== "VALID").length;
+
+  return (
+    <div className="mt-4 pt-4 border-t border-line">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-soft mb-2.5 flex items-center justify-between">
+        <span>Required Documents</span>
+        {item.document_status === "COMPLETE" ? (
+          <Badge variant="ok">All Documents Verified ✓</Badge>
+        ) : (
+          <Badge variant="excl">Action Needed ({missingCount} Pending)</Badge>
+        )}
+      </h4>
+      <ul className="space-y-1.5 mb-3">
+        {item.scheme_documents.map((d) => (
+          <li key={d.document_type} className="text-xs flex items-center gap-2">
+            {d.status === "VALID" ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-ok shrink-0" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 text-excl shrink-0" />
+            )}
+            <span className={d.status === "VALID" ? "text-ink" : "text-excl-ink font-medium"}>
+              {d.name} {!d.required && <span className="text-ink-soft font-normal">(Optional)</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <Button to="/documents" variant="secondary" size="sm">
+        {missingCount > 0 ? "Upload Missing Documents" : "View Documents"}
+      </Button>
+    </div>
+  );
+}
+
+function SatisfiedRulesList({ details }) {
+  if (!details || !Array.isArray(details.groups)) return null;
+
+  const passedRules = [];
+  details.groups.forEach((group) => {
+    if (Array.isArray(group.rules)) {
+      group.rules.forEach((r) => {
+        if (r && r.passed) {
+          passedRules.push(r.description || `${r.parameter.replace(/_/g, " ")} requirement satisfied`);
+        }
+      });
+    }
+  });
+
+  if (passedRules.length === 0) return null;
+
+  return (
+    <div className="mt-3.5 pt-3 border-t border-line/60">
+      <p className="text-xs font-semibold text-ink-soft mb-2 uppercase tracking-wider">Satisfied Criteria:</p>
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-ink">
+        {passedRules.map((desc, idx) => (
+          <li key={idx} className="flex items-start gap-1.5">
+            <Check className="h-3.5 w-3.5 text-ok shrink-0 mt-0.5" />
+            <span>{desc}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export default function CheckEligibilityPage() {
   const navigate = useNavigate();
-  // ?edit=1 (from Profile "Review & edit answers") forces the prefilled form
-  // directly, skipping the "results ready" interstitial.
   const [searchParams] = useSearchParams();
-  const editMode = searchParams.get("edit") === "1";
-  // loading|no-citizen|form|form-error|review|submitting|normalizing|evaluating
-  // |completed: form already submitted once — offer results / review / re-evaluate
+  const modeParam = searchParams.get("mode"); // 'form' to view questionnaire mode
+
+  // ---------------------------------------------------------------------------
+  // ALL HOOKS DEFINED UNCONDITIONALLY AT THE TOP OF THE COMPONENT
+  // ---------------------------------------------------------------------------
+
+  // Phase states: loading | no-citizen | ready | results | form | form-error
   const [phase, setPhase] = useState("loading");
-  const [identity, setIdentity] = useState(null);
+  const [citizen, setCitizen] = useState(null);
+  const [evaluating, setEvaluating] = useState(false);
+  const [resultsData, setResultsData] = useState(null);
+  const [showNonMatching, setShowNonMatching] = useState(false);
+
+  // Form Questionnaire states
   const [form, setForm] = useState(null);
   const [submission, setSubmission] = useState(null);
   const [answers, setAnswers] = useState(() => new Map());
   const [currentStep, setCurrentStep] = useState(0);
   const [message, setMessage] = useState("");
-  const [saveState, setSaveState] = useState("idle"); // idle|saving|saved
-  const [prefilled, setPrefilled] = useState(false);
+  const [saveState, setSaveState] = useState("idle");
   const [fieldErrors, setFieldErrors] = useState(() => new Map());
+  const [loadKey, setLoadKey] = useState(0);
+
+  // Guest registration form state
+  const [regForm, setRegForm] = useState({ full_name: "", date_of_birth: "", gender: "" });
+  const [regError, setRegError] = useState("");
+
   const answersRef = useRef(answers);
   answersRef.current = answers;
   const submissionInFlight = useRef(false);
-  const [loadKey, setLoadKey] = useState(0);
 
-  // ---------------- identity + form load (parallel) ----------------
-  // The citizen pointer (localStorage) and the active form definition are
-  // independent — fetch them together instead of serially. The form is the
-  // source of truth for every question; the citizen is the source of truth
-  // for identity (never re-asked inside the form).
+  // 1. Initial Load: Authenticated Citizen & Form Definition
   useEffect(() => {
     let cancelled = false;
-    // Resolve which citizen record to answer for: prefer the authenticated
-    // user's owned profile (never re-asks anything); fall back to the legacy
-    // localStorage pointer for guests of the old flow.
-    const loadCitizen = async () => {
+
+    const loadData = async () => {
+      let resolvedCitizen = null;
       try {
         const me = await authService.me();
-        const citizenId = me.data?.citizen_id;
-        if (citizenId) {
-          const response = await citizenService.get(citizenId);
-          return response.data;
+        const cid = me.data?.citizen_id;
+        if (cid) {
+          const res = await citizenService.get(cid);
+          resolvedCitizen = res.data;
         }
       } catch {
-        // Not signed in (or /me failed) — fall through to the legacy pointer.
+        // Not authenticated, fallback to local storage
       }
-      const stored = getStoredCitizenId();
-      if (!stored) return null;
+
+      if (!resolvedCitizen) {
+        const stored = getStoredCitizenId();
+        if (stored) {
+          try {
+            const res = await citizenService.get(stored);
+            resolvedCitizen = res.data;
+          } catch {
+            clearStoredCitizenId();
+          }
+        }
+      }
+
+      let formDef = null;
       try {
-        const response = await citizenService.get(stored);
-        return response.data;
-      } catch {
-        clearStoredCitizenId();
-        return null;
+        const formRes = await formService.getActive(FORM_CODE);
+        formDef = formRes.data;
+      } catch (err) {
+        console.warn("Form definition load notice:", err);
+      }
+
+      if (cancelled) return;
+
+      if (resolvedCitizen) {
+        setCitizen(resolvedCitizen);
+        if (formDef) setForm(formDef);
+        if (modeParam === "form") {
+          setPhase("form");
+        } else {
+          setPhase("ready");
+        }
+      } else {
+        if (formDef) setForm(formDef);
+        setPhase("no-citizen");
       }
     };
 
-    Promise.all([loadCitizen(), formService.getActive(FORM_CODE)])
-      .then(([citizen, formResponse]) => {
-        if (cancelled) return;
-        
-        if (citizen) {
-          const profileTypes = citizen.profile_types || [];
-          
-          // Filter sections based on selected profile types
-          const sectionToTypes = {
-            "EDUCATION_INFO": ["STUDENT"],
-            "AGRICULTURE_INFO": ["FARMER"],
-            "EMPLOYMENT_INFO": ["EMPLOYEE", "HOMEMAKER", "BUSINESS"], // Ensure it's shown for business too
-            "BUSINESS_INFO": ["BUSINESS"],
-            "DISABILITY_INFO": ["PWD"],
-          };
-          
-          const filteredSections = formResponse.data.sections.filter(sec => {
-            const targetTypes = sectionToTypes[sec.section_code];
-            if (!targetTypes) return true; // Common sections (Personal, Family, Financial, etc.) are shown to all
-            
-            // Special rule: Show Disability if PWD selected OR disability_status is YES
-            if (sec.section_code === "DISABILITY_INFO") {
-              if (profileTypes.includes("PWD")) return true;
-              if (citizen.demographic?.disability_status && citizen.demographic.disability_status !== "NONE") return true;
-            }
-            
-            return targetTypes.some(t => profileTypes.includes(t));
-          });
-          
-          setForm({ ...formResponse.data, sections: filteredSections });
-          
-          setIdentity({
-            citizenId: citizen.citizen_id,
-            fullName: citizen.full_name,
-            dateOfBirth: citizen.date_of_birth,
-            gender: citizen.gender,
-            profileTypes,
-          });
-          setPhase("form");
-        } else {
-          setForm(formResponse.data);
-          setPhase("no-citizen");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setPhase("form-error");
-      });
+    loadData().catch(() => {
+      if (!cancelled) setPhase("form-error");
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [loadKey]);
+  }, [loadKey, modeParam]);
 
-  // ---------------- draft create/resume ----------------
+  // 2. Perform Scheme Eligibility Evaluation on user action
+  const runEligibilityCheck = useCallback(async () => {
+    if (!citizen?.citizen_id) return;
+    setEvaluating(true);
+    setMessage("");
+
+    try {
+      // Step A: Evaluate schemes against bulk facts in PostgreSQL / Redis
+      await eligibilityService.evaluate(citizen.citizen_id);
+
+      // Step B: Fetch formatted recommendations & required documents
+      const recRes = await recommendationService.getForCitizen(citizen.citizen_id);
+      setResultsData(recRes.data);
+      setPhase("results");
+    } catch (err) {
+      console.error("Eligibility check failed:", err);
+      setMessage("Unable to complete eligibility check. Please try again.");
+    } finally {
+      setEvaluating(false);
+    }
+  }, [citizen]);
+
+  // 3. Guest Registration Handler
+  const registerGuest = useCallback(
+    async (event) => {
+      event.preventDefault();
+      setRegError("");
+      if (regForm.full_name.trim().length < 2 || !regForm.date_of_birth || regForm.date_of_birth >= TODAY) {
+        setRegError("Please enter your full name and a valid date of birth in the past.");
+        return;
+      }
+      try {
+        const response = await citizenService.register({
+          full_name: regForm.full_name.trim(),
+          date_of_birth: regForm.date_of_birth,
+          gender: regForm.gender || null,
+          citizen_type: "GENERAL",
+          demographic: { disability_status: "NONE" },
+          financial: { is_bpl_card_holder: false, is_income_tax_payer: false },
+          location: {},
+        });
+        const cid = response.data.citizen_id;
+        setStoredCitizenId(cid);
+        setCitizen(response.data);
+        setPhase("ready");
+      } catch {
+        setRegError("Unable to create profile right now. Please try again.");
+      }
+    },
+    [regForm]
+  );
+
+  // 4. Form Evaluation & Submission Helpers for questionnaire mode
   const ensureSubmission = useCallback(async () => {
-    // POST /submissions resumes the citizen's latest editable draft server-
-    // side. The in-flight guard stops React StrictMode's double effect fire
-    // in dev from racing two creates (harmless server-side, but wasteful).
-    // NOTE: deliberately does NOT setSubmission here — a state update mid-
-    // chain would re-trigger this effect (submission is a dep) and cancel
-    // the in-flight prefill work via the cleanup's `cancelled` flag. The
-    // caller sets all state together once the chain completes.
-    if (submissionInFlight.current) return null;
+    if (submissionInFlight.current || !citizen?.citizen_id) return null;
     submissionInFlight.current = true;
     try {
       const response = await formSubmissionService.create(FORM_CODE, {
-        citizen_id: identity.citizenId,
+        citizen_id: citizen.citizen_id,
         answers: [],
       });
       return response.data;
     } finally {
       submissionInFlight.current = false;
     }
-  }, [identity]);
+  }, [citizen]);
 
   useEffect(() => {
-    if (phase !== "form" || !identity || !form || submission) return;
+    if (phase !== "form" || !citizen || !form || submission) return;
     let cancelled = false;
-    ensureSubmission()
-      .then(async (draft) => {
-        if (cancelled || !draft) return;
-        const stored = storedAnswersByQuestionId(draft);
-        const byCode = new Map();
-        for (const section of form.sections) {
-          for (const question of section.questions) {
-            byCode.set(question.question_code, question);
-          }
-        }
-        let savedCount = 0;
-        // 1) Everything the citizen already answered in a previous visit
-        // (latest COMPLETED submission, or their draft). Answered questions
-        // are never asked again — they reappear prefilled and editable.
-        let hasCompleted = false;
-        try {
-          const savedResponse = await formService.getSavedAnswers(FORM_CODE);
-          const saved = savedResponse.data?.values || {};
-          hasCompleted = Boolean(savedResponse.data?.has_completed);
-          for (const [code, value] of Object.entries(saved)) {
-            const question = byCode.get(code);
-            if (question && !stored.has(question.question_id) && value !== null && value !== undefined) {
-              stored.set(question.question_id, value);
-              savedCount += 1;
-            }
-          }
-        } catch {
-          // Saved answers are an enhancement — the form still works without them.
-        }
-        // 2) Profile-derived prefill for anything still unanswered.
-        if (Object.keys(stored).length < form.sections.reduce((n, s) => n + s.questions.length, 0)) {
-          try {
-            const prefillResponse = await formService.getPrefill(FORM_CODE);
-            const prefill = prefillResponse.data?.values || {};
-            for (const [code, value] of Object.entries(prefill)) {
-              const question = byCode.get(code);
-              if (question && !stored.has(question.question_id) && value !== null && value !== undefined) {
-                stored.set(question.question_id, value);
-                savedCount += 1;
-              }
-            }
-          } catch {
-            // Prefill is an enhancement — the form is fully usable without it.
-          }
-        }
-        // Commit ALL state in one go, at the end of the chain — no state
-        // update happened mid-chain, so this work was never self-cancelled.
-        if (cancelled) return;
-        if (savedCount > 0) setPrefilled(true);
-        setSubmission(draft);
-        setAnswers(stored);
-        if (draft.completion_percentage > 0 || stored.size > 0) setSaveState("saved");
-        // Returning user who already completed the form: offer results, with
-        // the fully prefilled form one click away. ?edit=1 (Profile →
-        // "Review & edit answers") skips the interstitial entirely.
-        if (hasCompleted && !editMode) {
-          setPhase("completed");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setPhase("form-error");
-      });
+
+    ensureSubmission().then(async (draft) => {
+      if (cancelled || !draft) return;
+      const stored = storedAnswersByQuestionId(draft);
+      setSubmission(draft);
+      setAnswers(stored);
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [phase, identity, form, submission, ensureSubmission]);
+  }, [phase, citizen, form, submission, ensureSubmission]);
 
-  // ---------------- derived state ----------------
+  // Derived Form Mappings (Safe with null fallbacks)
   const applicable = useMemo(
     () => (form ? computeApplicableMap(form.sections, answers) : new Map()),
-    [form, answers],
+    [form, answers]
   );
   const progress = useMemo(
     () => (form ? computeProgress(form.sections, answers, applicable) : { total: 0, answered: 0, missingRequired: [] }),
-    [form, answers, applicable],
+    [form, answers, applicable]
   );
   const completion = percentage(progress.answered, progress.total);
-  const sectionsCount = form?.sections.length ?? 0;
-  const currentSection = form?.sections[currentStep];
+  const sectionsCount = form?.sections?.length ?? 0;
+  const currentSection = form?.sections?.[currentStep] ?? null;
 
-  // ---------------- actions ----------------
-  const answerQuestion = (question, value) => {
+  // Derived Scheme Results (Safe with null fallbacks)
+  const eligibleSchemes = useMemo(() => resultsData?.eligible_schemes || [], [resultsData]);
+  const ineligibleSchemes = useMemo(() => resultsData?.ineligible_schemes || [], [resultsData]);
+
+  const answerQuestion = useCallback((question, value) => {
     setAnswers((current) => {
       const next = new Map(current);
       next.set(question.question_id, value);
       return next;
     });
-    setFieldErrors((current) => {
-      if (!current.has(question.question_id)) return current;
-      const next = new Map(current);
-      next.delete(question.question_id);
-      return next;
-    });
-  };
+  }, []);
 
-  const goToStep = (index) => {
-    setCurrentStep(Math.min(Math.max(index, 0), Math.max(sectionsCount - 1, 0)));
-    window.scrollTo({ top: 0 });
-  };
+  const goToStep = useCallback(
+    (index) => {
+      setCurrentStep(Math.min(Math.max(index, 0), Math.max(sectionsCount - 1, 0)));
+      window.scrollTo({ top: 0 });
+    },
+    [sectionsCount]
+  );
 
-  const saveProgress = async () => {
-    setSaveState("saving");
-    setMessage("");
+  const submitFormAndEvaluate = useCallback(async () => {
+    if (!citizen?.citizen_id || !submission?.submission_id) return;
+    setEvaluating(true);
     try {
-      // Hidden (conditionally inapplicable) questions are never sent — the
-      // visibility map is recomputed from the exact answers being saved.
-      const nowApplicable = computeApplicableMap(form.sections, answersRef.current);
-      const payload = answersPayload(answersRef.current).filter((a) => nowApplicable.get(a.question_id, true));
-      const response = await formSubmissionService.update(submission.submission_id, {
-        citizen_id: identity.citizenId,
-        answers: payload,
+      await formSubmissionService.update(submission.submission_id, {
+        citizen_id: citizen.citizen_id,
+        answers: [...answers.entries()].map(([qid, val]) => ({ question_id: qid, value: val, source: "USER_INPUT" })),
       });
-      setSubmission(response.data);
-      setSaveState("saved");
-      setAnswers(storedAnswersByQuestionId(response.data));
-      return true;
-    } catch (error) {
-      setSaveState("idle");
-      setMessage(backendErrorMessage(error, form?.sections || []));
-      return false;
-    }
-  };
-
-  const saveAndContinue = async () => {
-    const saved = await saveProgress();
-    if (saved) goToStep(currentStep + 1);
-  };
-
-  // Skip to the next section WITHOUT saving — for returning users walking
-  // through already-prefilled sections they don't intend to change.
-  const nextWithoutSaving = () => goToStep(currentStep + 1);
-
-  const submitAll = async () => {
-    setPhase("submitting");
-    setMessage("");
-    try {
-      await saveProgress();
-      try {
-        await formSubmissionService.complete(submission.submission_id, { citizen_id: identity.citizenId });
-      } catch (error) {
-        const detail = error?.response?.data?.detail ?? {};
-        const missing = detail.missing_required || [];
-        if (missing.length > 0 && form) {
-          const nextErrors = new Map();
-          let target = -1;
-          form.sections.forEach((section, index) => {
-            for (const question of section.questions) {
-              if (missing.includes(question.question_code) && applicable.get(question.question_id, true)) {
-                nextErrors.set(question.question_id, "This answer is required.");
-                if (target < 0) target = index;
-              }
-            }
-          });
-          setFieldErrors(nextErrors);
-          setPhase("form");
-          goToStep(target >= 0 ? target : 0);
-          setMessage("Some required answers are still missing. They are marked below.");
-          return;
-        }
-        throw error;
-      }
-      setPhase("normalizing");
-      await formSubmissionService.normalize(submission.submission_id, { citizen_id: identity.citizenId });
-      // Existing eligibility flow: the results page reads stored assessments,
-      // so evaluate (backend engine, unchanged) before navigating.
-      setPhase("evaluating");
-      await eligibilityService.evaluate(identity.citizenId);
-      navigate(`/results/${identity.citizenId}`);
-    } catch (error) {
+      await formSubmissionService.complete(submission.submission_id, { citizen_id: citizen.citizen_id });
+      await formSubmissionService.normalize(submission.submission_id, { citizen_id: citizen.citizen_id });
+      await runEligibilityCheck();
+    } catch (err) {
+      console.error(err);
       setPhase("form");
-      setMessage(backendErrorMessage(error, form?.sections || []));
+      setMessage("Failed to submit form answers.");
+    } finally {
+      setEvaluating(false);
     }
-  };
+  }, [citizen, submission, answers, runEligibilityCheck]);
 
-  // ---------------- first-time registration (no auth exists yet) ----------------
-  const [regForm, setRegForm] = useState({ full_name: "", date_of_birth: "", gender: "" });
-  const [regError, setRegError] = useState("");
-  const register = async (event) => {
-    event.preventDefault();
-    setRegError("");
-    if (regForm.full_name.trim().length < 2 || !regForm.date_of_birth || regForm.date_of_birth >= TODAY) {
-      setRegError("Please enter your full name and a date of birth in the past.");
-      return;
-    }
-    try {
-      const response = await citizenService.register({
-        full_name: regForm.full_name.trim(),
-        date_of_birth: regForm.date_of_birth,
-        gender: regForm.gender || null,
-        citizen_type: "GENERAL",
-        demographic: { disability_status: "NONE" },
-        financial: { is_bpl_card_holder: false, is_income_tax_payer: false },
-        location: {},
-      });
-      const citizenId = response.data.citizen_id;
-      setStoredCitizenId(citizenId);
-      setIdentity({
-        citizenId,
-        fullName: response.data.full_name,
-        dateOfBirth: response.data.date_of_birth,
-        gender: response.data.gender,
-      });
-      // The form definition is already in state (loaded in parallel with the
-      // citizen check) — no second fetch, no second identity step.
-      setPhase("form");
-    } catch {
-      setRegError("Unable to create your profile right now. Please try again.");
-    }
-  };
+  // ---------------------------------------------------------------------------
+  // CONDITIONAL VIEW RENDERING AFTER ALL HOOKS
+  // ---------------------------------------------------------------------------
 
-  // ---------------- review data ----------------
-  const reviewSections = useMemo(() => {
-    if (!form) return [];
-    return form.sections
-      .map((section) => ({
-        section,
-        items: section.questions
-          .filter((q) => applicable.get(q.question_id, true))
-          .map((q) => ({ question: q, value: answers.get(q.question_id) ?? null })),
-      }))
-      .filter((entry) => entry.items.length > 0);
-  }, [form, answers, applicable]);
-
-  // ---------------- completed screen (returning user) ----------------
-  // Deliberately placed AFTER every hook: an early return above a hook would
-  // crash React with "rendered fewer hooks than expected".
-  if (phase === "completed") {
-    return (
-      <div className="max-w-[720px]">
-        <div className="mb-7">
-          <h1 className="text-[30px] mb-3">Your eligibility is ready</h1>
-          <p className="max-w-[66ch] mb-5">
-            You have already completed your profile, {identity?.fullName?.split(" ")[0] || ""}. Your
-            results are up to date — view them now, or update any answer and
-            we will re-evaluate you.
-          </p>
-        </div>
-        <Card>
-          <div className="flex flex-col gap-3">
-            <Button onClick={() => navigate(`/results/${identity.citizenId}`)}>
-              View my results
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setPhase("form");
-                setPrefilled(true);
-              }}
-            >
-              Update my answers
-            </Button>
-            <p className="text-xs text-ink-soft mt-2 mb-0">
-              “Update my answers” opens your form fully prefilled — change only
-              what changed, save, and your results re-evaluate automatically.
-            </p>
-          </div>
-        </Card>
-      </div>
-    );
+  if (phase === "loading") {
+    return <LoadingState label="Loading your profile & eligibility..." />;
   }
-
-  // ---------------- renders ----------------
-  if (phase === "loading") return <LoadingState label="Loading your profile..." />;
 
   if (phase === "form-error") {
     return (
       <ErrorState
-        title="Unable to load the form"
-        message="The form service is not responding right now. Anything you already saved is safe — please try again."
+        title="Unable to load eligibility service"
+        message="The service is currently reconnecting. Please retry."
         onRetry={() => {
-          setForm(null);
-          setSubmission(null);
           setPhase("loading");
-          // Re-run the combined citizen+form load in place (no full page
-          // reload — the local context is fine, the fetch just failed).
-          setLoadKey((key) => key + 1);
+          setLoadKey((k) => k + 1);
         }}
       />
     );
   }
 
+  // 1. Guest View (Profile registration before checking)
   if (phase === "no-citizen") {
     return (
-      <div>
-        <div className="mb-7">
-          <h1 className="text-[30px] mb-3">Check your eligibility</h1>
-          <p className="max-w-[66ch] mb-5">
-            First create your citizen profile, then answer a short set of questions. We use your answers only to work
-            out which government schemes you may be eligible for.
+      <div className="max-w-2xl mx-auto py-6">
+        <div className="mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-soft/30 text-brand rounded-full text-xs font-semibold mb-3">
+            <Sparkles className="h-3.5 w-3.5" /> VidyaSetu Eligibility Portal
+          </div>
+          <h1 className="text-3xl font-bold text-ink mb-2">Check Your Welfare Eligibility</h1>
+          <p className="text-ink-soft text-sm">
+            Enter your basic details below to instantly evaluate your eligibility across all active government schemes.
           </p>
         </div>
-        <Card>
-          <form onSubmit={register} noValidate>
-            <div className="grid md:grid-cols-2 gap-x-5">
+        <Card className="p-6">
+          <form onSubmit={registerGuest} noValidate>
+            <div className="grid md:grid-cols-2 gap-4">
               <Input
                 id="reg-name"
-                label="Full name"
+                label="Full Name"
                 required
                 value={regForm.full_name}
                 autoComplete="name"
-                onChange={(event) => setRegForm((current) => ({ ...current, full_name: event.target.value }))}
+                placeholder="As per official ID"
+                onChange={(e) => setRegForm((c) => ({ ...c, full_name: e.target.value }))}
               />
               <Input
                 id="reg-dob"
-                label="Date of birth"
+                label="Date of Birth"
                 required
                 type="date"
                 max={TODAY}
                 value={regForm.date_of_birth}
                 error={regError || undefined}
-                onChange={(event) => setRegForm((current) => ({ ...current, date_of_birth: event.target.value }))}
+                onChange={(e) => setRegForm((c) => ({ ...c, date_of_birth: e.target.value }))}
               />
               <Select
                 id="reg-gender"
                 label="Gender"
                 value={regForm.gender}
-                onChange={(event) => setRegForm((current) => ({ ...current, gender: event.target.value }))}
+                onChange={(e) => setRegForm((c) => ({ ...c, gender: e.target.value }))}
               >
-                <option value="">Prefer not to say</option>
+                <option value="">Select Gender</option>
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
                 <option value="OTHER">Other</option>
               </Select>
             </div>
-            <div className="flex justify-end mt-4 pt-5 border-t border-line">
-              <Button type="submit">Create profile and continue</Button>
+            <div className="flex justify-end mt-6 pt-4 border-t border-line">
+              <Button type="submit" variant="primary">
+                Continue to Eligibility Check <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
             </div>
           </form>
         </Card>
@@ -493,72 +451,37 @@ export default function CheckEligibilityPage() {
     );
   }
 
-  if (phase === "review") {
+  // 2. Questionnaire Form View (if mode=form)
+  if (phase === "form" && form && currentSection) {
     return (
-      <div>
-        <div className="mb-7">
-          <h1 className="text-[30px] mb-3">Review your information</h1>
-          <p className="max-w-[66ch]">Check everything below. Use Edit to go back to any section.</p>
+      <div className="max-w-3xl mx-auto py-4">
+        <div className="flex items-center justify-between mb-4">
+          <Button variant="ghost" size="sm" onClick={() => setPhase("ready")}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> Back to Profile Summary
+          </Button>
+          <span className="text-xs text-ink-soft">
+            Section {currentStep + 1} of {sectionsCount}
+          </span>
+        </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-ink mb-1">{form.form_name}</h1>
+          <p className="text-xs text-ink-soft">{form.description}</p>
+          <div className="mt-4">
+            <FormProgress
+              sections={form.sections}
+              currentStep={currentStep}
+              applicable={applicable}
+              answers={answers}
+              completionPercentage={completion}
+            />
+          </div>
         </div>
         {message && (
-          <div className="mb-5">
-            <ErrorState title="Unable to continue" message={message} />
+          <div className="mb-4">
+            <ErrorState title="Error" message={message} />
           </div>
         )}
-        <ReviewStep reviewSections={reviewSections} onEdit={goToStep} />
-        <div className="flex flex-wrap justify-between gap-3 mt-7 pt-5 border-t border-line">
-          <Button type="button" variant="ghost" onClick={() => setPhase("form")}>
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Back to form
-          </Button>
-          <Button onClick={submitAll} disabled={phase !== "review"}>
-            Submit and check eligibility
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "submitting" || phase === "normalizing" || phase === "evaluating") {
-    return (
-      <LoadingState
-        label={phase === "submitting" ? "Submitting your answers..." : phase === "normalizing" ? "Organising your information..." : "Checking schemes for you..."}
-      />
-    );
-  }
-
-  return (
-    <div>
-      <div className="mb-7">
-        <h1 className="text-[30px] mb-3">{form?.form_name || "Check your eligibility"}</h1>
-        <p className="max-w-[66ch] mb-3">
-          {form?.description || "Answer the questions below. Your progress is saved as you go."}
-        </p>
-        {identity && (
-          <p className="text-xs text-ink-soft mb-5">
-            Answering as <span className="text-ink font-medium">{identity.fullName}</span>
-            {identity.dateOfBirth ? ` · DOB ${identity.dateOfBirth}` : ""} — this was set when you created your
-            profile and is not asked again here.
-            {prefilled &&
-              " Everything you answered before is prefilled below — only new questions need answering, and you can update any prefilled answer."}
-          </p>
-        )}
-        {form && submission && (
-          <FormProgress
-            sections={form.sections}
-            currentStep={currentStep}
-            applicable={applicable}
-            answers={answers}
-            completionPercentage={Math.max(submission.completion_percentage ?? 0, completion)}
-          />
-        )}
-      </div>
-      {message && (
-        <div className="mb-5">
-          <ErrorState title="Unable to continue" message={message} />
-        </div>
-      )}
-      {form && currentSection && submission && (
-        <Card>
+        <Card className="p-6">
           <FormSection
             section={currentSection}
             answers={answers}
@@ -568,39 +491,249 @@ export default function CheckEligibilityPage() {
             sectionIndex={currentStep}
             totalSections={sectionsCount}
           />
-          <div className="flex flex-wrap justify-between items-center gap-3 mt-7 pt-5 border-t border-line">
-            <Button type="button" variant="ghost" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 0}>
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Back
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => goToStep(currentStep - 1)}
+              disabled={currentStep === 0}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" /> Back
             </Button>
-            <div className="flex items-center gap-3">
-              {saveState === "saving" && (
-                <span className="text-xs text-ink-soft flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Saving...
-                </span>
-              )}
-              {saveState === "saved" && (
-                <span className="text-xs text-ok-ink flex items-center gap-1">
-                  <Check className="h-3 w-3" aria-hidden="true" /> Progress saved
-                </span>
-              )}
-              <Button type="button" variant="secondary" onClick={saveProgress} disabled={saveState === "saving"}>
-                Save draft
-              </Button>
+            <div className="flex items-center gap-2">
               {currentStep < sectionsCount - 1 ? (
-                <>
-                  <Button type="button" variant="secondary" onClick={nextWithoutSaving}>
-                    Next
-                  </Button>
-                  <Button onClick={saveAndContinue}>
-                    Save &amp; continue <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </>
+                <Button onClick={() => goToStep(currentStep + 1)}>
+                  Next Section <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               ) : (
-                <Button onClick={() => setPhase("review")}>Review &amp; submit</Button>
+                <Button onClick={submitFormAndEvaluate} disabled={evaluating}>
+                  {evaluating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} Submit &amp; Evaluate
+                </Button>
               )}
             </div>
           </div>
         </Card>
+      </div>
+    );
+  }
+
+  // 3. Standard Clean Check Eligibility View
+  return (
+    <div className="max-w-3xl mx-auto py-6 space-y-6">
+      {/* Title */}
+      <div>
+        <h1 className="text-3xl font-bold text-ink mb-1">Check Scheme Eligibility</h1>
+        <p className="text-ink-soft text-sm">
+          Instantly evaluate which government welfare schemes and scholarships match your profile.
+        </p>
+      </div>
+
+      {/* Citizen Profile Status Summary Card */}
+      {citizen && (
+        <Card className="p-6 border-l-4 border-l-brand">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-brand">Citizen Profile</span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-ok-ink bg-ok-soft/30 px-2 py-0.5 rounded-full border border-ok-soft">
+                  <Check className="h-3 w-3 text-ok" /> Profile Complete ✓
+                </span>
+                <span className="text-xs text-ink-soft bg-surface px-2 py-0.5 rounded border border-line">
+                  v{citizen.profile_version || 1}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-baseline gap-2">
+                <h2 className="text-xl font-bold text-ink">{citizen.full_name}</h2>
+                <span className="text-xs text-ink-soft">
+                  {citizen.gender ? `${citizen.gender} · ` : ""}DOB: {citizen.date_of_birth || "N/A"}
+                </span>
+              </div>
+
+              {/* Profile badges */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {(citizen.profile_types || ["GENERAL"]).map((type) => (
+                  <Badge key={type} variant="brand">
+                    {type}
+                  </Badge>
+                ))}
+                {citizen.demographic?.social_category && (
+                  <Badge variant="neutral">{citizen.demographic.social_category}</Badge>
+                )}
+                {citizen.location?.state && (
+                  <Badge variant="neutral">{citizen.location.state}</Badge>
+                )}
+                {citizen.demographic?.education_level && (
+                  <Badge variant="neutral">{citizen.demographic.education_level}</Badge>
+                )}
+                {citizen.financial?.is_bpl_card_holder && <Badge variant="ok">BPL</Badge>}
+              </div>
+
+              <p className="text-xs text-ink-soft pt-1">
+                Last Updated:{" "}
+                <span className="font-medium text-ink">
+                  {formatTimestamp(citizen.updated_at || citizen.created_at || citizen.registration_date)}
+                </span>
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-col gap-2 shrink-0">
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={runEligibilityCheck}
+                disabled={evaluating}
+                className="shadow-sm font-semibold"
+              >
+                {evaluating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Checking...
+                  </>
+                ) : resultsData ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Re-check Eligibility
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Check My Eligibility
+                  </>
+                )}
+              </Button>
+
+              <Button to="/profile" variant="secondary" size="sm" className="justify-center">
+                Review My Profile
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Evaluating Status State */}
+      {evaluating && (
+        <Card className="p-8 text-center bg-brand-soft/10 border border-brand/20">
+          <Loader2 className="h-8 w-8 animate-spin text-brand mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-ink">Checking your eligibility...</h3>
+          <p className="text-xs text-ink-soft max-w-md mx-auto mt-1">
+            Evaluating active central and state welfare rules against your canonical profile facts.
+          </p>
+        </Card>
+      )}
+
+      {/* Error Message */}
+      {message && (
+        <div>
+          <ErrorState title="Evaluation Error" message={message} onRetry={runEligibilityCheck} />
+        </div>
+      )}
+
+      {/* Results Presentation */}
+      {resultsData && !evaluating && (
+        <div className="space-y-6 pt-2">
+          {/* Section: Eligible Schemes */}
+          {eligibleSchemes.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-line">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-ok" />
+                  <h2 className="text-xl font-bold text-ink">
+                    Eligible for You <span className="text-sm font-normal text-ink-soft">({eligibleSchemes.length} matching)</span>
+                  </h2>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {eligibleSchemes.map((item) => (
+                  <Card key={item.scheme.scheme_id} eligible className="p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-ink mb-1">{item.scheme.scheme_name}</h3>
+                        <SchemeMeta scheme={item.scheme} />
+                      </div>
+                      <Button to={`/schemes/${item.scheme.scheme_id}`} variant="primary" size="sm">
+                        View Scheme <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                    </div>
+
+                    {item.scheme.benefit_description && (
+                      <p className="text-xs text-ink mt-2.5 mb-0 leading-relaxed">
+                        {item.scheme.benefit_description}
+                      </p>
+                    )}
+
+                    {/* Satisfied Criteria Checklist */}
+                    <SatisfiedRulesList details={item.evaluation_details} />
+
+                    {/* Required Documents Section */}
+                    <SchemeDocuments item={item} />
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Zero Matches State */
+            <Card className="p-6 border border-line bg-surface">
+              <div className="text-center py-4 max-w-md mx-auto">
+                <div className="h-12 w-12 rounded-full bg-surface-soft border border-line flex items-center justify-center mx-auto mb-3 text-ink-soft">
+                  <HelpCircle className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-bold text-ink mb-1">No matching schemes found yet</h3>
+                <p className="text-xs text-ink-soft mb-4">
+                  We checked available schemes against your profile. You may not meet specific criteria for currently published schemes.
+                </p>
+
+                <div className="text-left bg-surface-soft p-3.5 rounded-lg border border-line text-xs text-ink space-y-1.5 mb-4">
+                  <p className="font-semibold text-ink-soft uppercase tracking-wider text-[11px]">Possible reasons:</p>
+                  <p>• Missing profile information (e.g. academic marks, farmer type)</p>
+                  <p>• Required education level or branch criteria</p>
+                  <p>• Income threshold limits</p>
+                  <p>• Social category or location restrictions</p>
+                </div>
+
+                <Button to="/profile" variant="primary">
+                  Review &amp; Update Profile
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* Section: Non-Matching Schemes (Collapsed by Default) */}
+          {ineligibleSchemes.length > 0 && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowNonMatching((prev) => !prev)}
+                className="w-full flex items-center justify-between p-3.5 bg-surface-soft hover:bg-line/40 rounded-lg border border-line text-xs font-semibold text-ink-soft hover:text-ink transition-colors"
+              >
+                <span>Why other schemes didn't match ({ineligibleSchemes.length})</span>
+                {showNonMatching ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+
+              {showNonMatching && (
+                <div className="mt-3 space-y-3">
+                  {ineligibleSchemes.map((item) => (
+                    <Card key={item.scheme.scheme_id} className="p-4 bg-surface/60">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                        <div>
+                          <h4 className="text-sm font-semibold text-ink">{item.scheme.scheme_name}</h4>
+                          <span className="text-xs text-ink-soft">{item.scheme.department_name}</span>
+                        </div>
+                        <Button to={`/schemes/${item.scheme.scheme_id}`} variant="ghost" size="sm">
+                          View Details
+                        </Button>
+                      </div>
+                      <p className="text-xs text-excl-ink font-medium mt-2 mb-0">
+                        Reason: {item.reason || "Eligibility conditions were not satisfied."}
+                      </p>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

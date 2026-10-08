@@ -20,10 +20,14 @@ class EligibilityEngine:
     """Core rule evaluation engine."""
 
     def evaluate_scheme(
-        self, citizen: CitizenMaster, scheme: SchemeMaster
+        self,
+        citizen: CitizenMaster,
+        scheme: SchemeMaster,
+        facts_dict: dict[str, Any] | None = None,
     ) -> Tuple[bool, dict[str, Any], str]:
         """
         Evaluate a single scheme for a citizen.
+        Accepts optional preloaded facts_dict for O(1) bulk fact resolution.
         Returns: (overall_result, evaluation_details_jsonb, reason)
         """
         group_results = []
@@ -36,7 +40,7 @@ class EligibilityEngine:
             rule_results = []
             
             for rule in group.rules:
-                actual_value = self._resolve_parameter(citizen, rule.parameter_name)
+                actual_value = self._resolve_parameter(citizen, rule.parameter_name, facts_dict=facts_dict)
                 is_missing = actual_value is None
                 passed = self._apply_operator(actual_value, rule.operator, rule.required_value)
 
@@ -110,79 +114,98 @@ class EligibilityEngine:
 
         return overall_result, evaluation_details, reason
 
-    def _fact_value(self, citizen: CitizenMaster, fact_code: str) -> str | None:
+    def _fact_value(
+        self, citizen: CitizenMaster, fact_code: str, facts_dict: dict[str, Any] | None = None
+    ) -> str | None:
         """Open profile-fact value for a code (fact layer = canonical store
         the normalization pipeline writes). None when never answered."""
+        if facts_dict is not None:
+            return facts_dict.get(fact_code)
         for fact in (getattr(citizen, "profile_facts", None) or []):
             if fact.fact_code == fact_code and fact.effective_until is None:
                 return fact.fact_value
         return None
 
-    def _resolve_parameter(self, citizen: CitizenMaster, parameter_name: str) -> Any:
-        """Map parameter names to actual DB column values."""
+    def _resolve_parameter(
+        self, citizen: CitizenMaster, parameter_name: str, facts_dict: dict[str, Any] | None = None
+    ) -> Any:
+        """Map parameter names to actual DB column or bulk fact values."""
         if parameter_name == "age":
-            # Canonical source: the normalized AGE profile fact (derived from
-            # the citizen-submitted DATE_OF_BIRTH by normalization). Falls
-            # back to identity-record DOB + calculate_age only for citizens
-            # who have never completed a form (no fact layer yet).
-            facts = getattr(citizen, "profile_facts", None) or []
-            for fact in facts:
-                if fact.fact_code == "AGE" and fact.effective_until is None:
-                    try:
-                        return int(fact.fact_value)
-                    except (TypeError, ValueError):
-                        break
+            # Canonical source: normalized AGE fact
+            age_val = self._fact_value(citizen, "AGE", facts_dict=facts_dict)
+            if age_val is not None:
+                try:
+                    return int(age_val)
+                except (TypeError, ValueError):
+                    pass
             dob = citizen.date_of_birth
             if dob is None:
                 return None
             return calculate_age(dob)
         
         elif parameter_name == "gender":
-            return citizen.gender
+            gen_val = self._fact_value(citizen, "GENDER", facts_dict=facts_dict)
+            return gen_val if gen_val is not None else citizen.gender
         
         elif parameter_name == "citizen_type":
             return citizen.citizen_type
             
         elif parameter_name == "annual_income":
+            inc_val = self._fact_value(citizen, "ANNUAL_INCOME", facts_dict=facts_dict)
+            if inc_val is not None:
+                try:
+                    return float(inc_val)
+                except (TypeError, ValueError):
+                    pass
             return float(citizen.financial_profile.annual_income) if citizen.financial_profile and citizen.financial_profile.annual_income is not None else 0.0
             
         elif parameter_name == "poverty_category":
+            pov_val = self._fact_value(citizen, "POVERTY_CATEGORY", facts_dict=facts_dict)
+            if pov_val is not None:
+                return pov_val
             return citizen.financial_profile.poverty_category if citizen.financial_profile else None
             
         elif parameter_name == "land_holding_size":
+            land_val = self._fact_value(citizen, "LAND_HOLDING_SIZE", facts_dict=facts_dict)
+            if land_val is not None:
+                try:
+                    return float(land_val)
+                except (TypeError, ValueError):
+                    pass
             return float(citizen.financial_profile.land_holding_size) if citizen.financial_profile and citizen.financial_profile.land_holding_size is not None else 0.0
             
         elif parameter_name == "is_bpl_card_holder":
+            bpl_val = self._fact_value(citizen, "IS_BPL_CARD_HOLDER", facts_dict=facts_dict)
+            if bpl_val is not None:
+                return bpl_val in ("True", "true", "1", "YES", True)
             return citizen.financial_profile.is_bpl_card_holder if citizen.financial_profile else False
             
         elif parameter_name == "is_income_tax_payer":
+            tax_val = self._fact_value(citizen, "IS_INCOME_TAX_PAYER", facts_dict=facts_dict)
+            if tax_val is not None:
+                return tax_val in ("True", "true", "1", "YES", True)
             return citizen.financial_profile.is_income_tax_payer if citizen.financial_profile else False
             
         elif parameter_name == "employment_status":
-            # Fact layer first (the canonical post-normalization store the
-            # registry writes), then the legacy V1 financial-profile column.
-            fact_value = self._fact_value(citizen, "EMPLOYMENT_STATUS")
+            fact_value = self._fact_value(citizen, "EMPLOYMENT_STATUS", facts_dict=facts_dict)
             if fact_value is not None:
                 return fact_value
             return citizen.financial_profile.employment_status if citizen.financial_profile else None
             
         elif parameter_name == "social_category":
+            soc_val = self._fact_value(citizen, "SOCIAL_CATEGORY", facts_dict=facts_dict)
+            if soc_val is not None:
+                return soc_val
             return citizen.demographic_profile.social_category if citizen.demographic_profile else None
             
         elif parameter_name == "education_level":
-            # Fact layer first: the v3 form writes education answers to the
-            # EDUCATION_LEVEL fact; the old demographic_profile.education_level
-            # column is empty for citizens who only used the form.
-            fact_value = self._fact_value(citizen, "EDUCATION_LEVEL")
+            fact_value = self._fact_value(citizen, "EDUCATION_LEVEL", facts_dict=facts_dict)
             if fact_value is not None:
                 return fact_value
             return citizen.demographic_profile.education_level if citizen.demographic_profile else None
             
         elif parameter_name == "disability_status":
-            # Fact layer first. The v3 form's HAS_DISABILITY answer stores
-            # YES/NO/PENDING; map deterministically to the canonical values
-            # scheme rules compare against (NONE = no disability).
-            fact_value = self._fact_value(citizen, "DISABILITY_STATUS")
+            fact_value = self._fact_value(citizen, "DISABILITY_STATUS", facts_dict=facts_dict)
             if fact_value == "YES":
                 return "PHYSICALLY_DISABLED"
             if fact_value == "NO":
@@ -192,35 +215,59 @@ class EligibilityEngine:
             return citizen.demographic_profile.disability_status if citizen.demographic_profile else "NONE"
             
         elif parameter_name == "area_type":
+            area_val = self._fact_value(citizen, "AREA_TYPE", facts_dict=facts_dict)
+            if area_val is not None:
+                return area_val
             return citizen.location_profile.area_type if citizen.location_profile else None
 
         elif parameter_name == "state":
+            state_val = self._fact_value(citizen, "STATE", facts_dict=facts_dict)
+            if state_val is not None:
+                return state_val
             return citizen.location_profile.state if citizen.location_profile else None
 
         # ------------------------------------------------------------------
         # Academic-record parameters (read from the open profile-fact layer;
-        # facts are the canonical store for exact 10th/12th marks and
-        # percentile. Additive branch — existing parameter logic unchanged.
+        # facts are the canonical store for exact 10th/12th marks, current
+        # degree, CGPA, etc.). Additive branch — existing logic unchanged.
         # ------------------------------------------------------------------
         elif parameter_name in (
             "tenth_percentage", "twelfth_percentage", "twelfth_percentile",
+            "graduation_percentage", "graduation_cgpa",
             "livestock_cattle_count", "livestock_poultry_count",
         ):
             fact_code_map = {
                 "tenth_percentage": "TENTH_PERCENTAGE",
                 "twelfth_percentage": "TWELFTH_PERCENTAGE",
                 "twelfth_percentile": "TWELFTH_PERCENTILE",
+                "graduation_percentage": "GRADUATION_PERCENTAGE",
+                "graduation_cgpa": "GRADUATION_CGPA",
                 "livestock_cattle_count": "LIVESTOCK_CATTLE_COUNT",
                 "livestock_poultry_count": "LIVESTOCK_POULTRY_COUNT",
             }
             wanted = fact_code_map[parameter_name]
-            for fact in (getattr(citizen, "profile_facts", None) or []):
-                if fact.fact_code == wanted and fact.effective_until is None:
-                    try:
-                        return float(fact.fact_value)
-                    except (TypeError, ValueError):
-                        break
+            val = self._fact_value(citizen, wanted, facts_dict=facts_dict)
+            if val is not None:
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    pass
             return None  # never answered — rule fails with "not provided"
+
+        elif parameter_name in (
+            "current_education_level", "current_degree", "current_branch",
+            "current_year", "current_semester", "highest_education_level",
+        ):
+            fact_code_map = {
+                "current_education_level": "CURRENT_EDUCATION_LEVEL",
+                "current_degree": "CURRENT_DEGREE",
+                "current_branch": "CURRENT_BRANCH",
+                "current_year": "CURRENT_YEAR",
+                "current_semester": "CURRENT_SEMESTER",
+                "highest_education_level": "HIGHEST_EDUCATION_LEVEL",
+            }
+            wanted = fact_code_map[parameter_name]
+            return self._fact_value(citizen, wanted, facts_dict=facts_dict)
 
         else:
             logger.warning(f"Unknown parameter_name: {parameter_name}")

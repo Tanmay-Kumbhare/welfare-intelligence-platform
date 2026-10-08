@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.auth.session import hash_session_token
 from app.models.auth import UserAccount, UserRole, UserSession
@@ -23,13 +24,19 @@ class AuthRepository:
 
     async def get_by_email(self, email: str) -> UserAccount | None:
         result = await self.db.execute(
-            select(UserAccount).where(UserAccount.email == email).limit(1)
+            select(UserAccount)
+            .where(UserAccount.email == email)
+            .options(selectinload(UserAccount.roles))
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
     async def get_by_id(self, user_id: uuid.UUID) -> UserAccount | None:
         result = await self.db.execute(
-            select(UserAccount).where(UserAccount.user_id == user_id).limit(1)
+            select(UserAccount)
+            .where(UserAccount.user_id == user_id)
+            .options(selectinload(UserAccount.roles))
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -127,18 +134,23 @@ class AuthRepository:
 
     async def find_session_by_token(self, token: str) -> UserSession | None:
         """
-        Lookup session by raw token.
+        Lookup session by raw token with user and roles eagerly loaded.
         Queries by SHA-256 digest, with fallback to raw token for any
         pre-existing unhashed sessions.
         """
         token_digest = hash_session_token(token)
         result = await self.db.execute(
-            select(UserSession).where(
+            select(UserSession)
+            .where(
                 or_(
                     UserSession.token_hash == token_digest,
                     UserSession.token_hash == token,
                 )
-            ).limit(1)
+            )
+            .options(
+                joinedload(UserSession.user).selectinload(UserAccount.roles)
+            )
+            .limit(1)
         )
         session = result.scalar_one_or_none()
         # Transparently upgrade legacy unhashed token row to hashed
@@ -164,8 +176,17 @@ class AuthRepository:
         await self.db.flush()
         return session
 
-    async def refresh_session_last_used(self, session: UserSession) -> None:
-        session.last_used_at = datetime.now(timezone.utc)
+    async def refresh_session_last_used(
+        self, session: UserSession, min_interval_seconds: int = 300
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        if session.last_used_at is not None:
+            last_used = session.last_used_at
+            if last_used.tzinfo is None:
+                last_used = last_used.replace(tzinfo=timezone.utc)
+            if (now - last_used).total_seconds() < min_interval_seconds:
+                return  # Skip write: last_used was updated recently
+        session.last_used_at = now
         await self.db.flush()
 
     async def invalidate_sessions_for_user(self, user_id: uuid.UUID) -> None:

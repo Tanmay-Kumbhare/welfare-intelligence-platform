@@ -154,8 +154,8 @@ class FormService:
         questions/options surface here; the version snapshot returned is
         the highest active one.
         """
-        cache_key = f"{forms_list_key()}:{target_citizen_type or 'all'}"
-        cached = cache.get(cache_key)
+        cache_key = forms_list_key(target_citizen_type)
+        cached = await cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -175,12 +175,13 @@ class FormService:
             )
             for f in sorted(latest_by_code.values(), key=lambda f: f.form_code)
         ]
-        cache.set(cache_key, [s.model_dump() for s in summaries])
+        serialized = [s.model_dump(mode="json") for s in summaries]
+        await cache.set(cache_key, serialized, ttl=300)
         return summaries
 
     async def get_active_form(self, form_code: str) -> FormDetail:
         cache_key = form_active_key(form_code)
-        cached = cache.get(cache_key)
+        cached = await cache.get(cache_key)
         if cached is not None:
             return FormDetail.model_validate(cached)
 
@@ -188,7 +189,7 @@ class FormService:
         if form is None:
             raise FormNotFoundError(f"Form '{form_code}' not found or not active")
         detail = self._form_detail(form)
-        cache.set(cache_key, detail.model_dump())
+        await cache.set(cache_key, detail.model_dump(mode="json"), ttl=300)
         return detail
 
     async def list_versions(self, form_code: str) -> FormVersionsResponse:

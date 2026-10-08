@@ -11,9 +11,9 @@ Tables:
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -35,6 +35,13 @@ class CitizenMaster(Base):
     # FARMER | STUDENT | SENIOR | GENERAL
     citizen_type: Mapped[str] = mapped_column(String(20), nullable=False)
     registration_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    profile_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1", default=1)
     # PENDING | VERIFIED
     verification_status: Mapped[str] = mapped_column(String(20), default="PENDING")
     # Link to the authenticated user who owns this citizen profile.
@@ -59,6 +66,9 @@ class CitizenMaster(Base):
     )
     assessments: Mapped[list["EligibilityAssessment"]] = relationship(  # type: ignore[name-defined]
         back_populates="citizen", cascade="all, delete-orphan"
+    )
+    education_records: Mapped[list["EducationRecord"]] = relationship(  # type: ignore[name-defined]
+        back_populates="citizen", cascade="all, delete-orphan", order_by="EducationRecord.created_at"
     )
     # Normalized profile facts (tbl_profile_fact); open (current) facts are
     # consumed by the eligibility engine via get_full_profile eager loading.
@@ -144,11 +154,16 @@ class LocationProfile(Base):
         unique=True,
         nullable=False,
     )
+    address_line_1: Mapped[str | None] = mapped_column(String(255))
+    address_line_2: Mapped[str | None] = mapped_column(String(255))
     state: Mapped[str | None] = mapped_column(String(100))
     district: Mapped[str | None] = mapped_column(String(100))
     village_city: Mapped[str | None] = mapped_column(String(150))
+    pincode: Mapped[str | None] = mapped_column(String(10))
     # RURAL | URBAN | SEMI_URBAN — used in PMAY-G rule
     area_type: Mapped[str | None] = mapped_column(String(15))
+    same_as_permanent: Mapped[bool] = mapped_column(Boolean, default=True)
+    current_address: Mapped[dict | None] = mapped_column(JSONB)
 
     citizen: Mapped["CitizenMaster"] = relationship(back_populates="location_profile")
 

@@ -29,4 +29,7 @@ httpx==0.28.1
 # self-test), which made every register/login hash call crash with a 500.
 passlib[bcrypt]==1.7.4
 bcrypt>=4.0,<4.1
-email-validator==2.2.0 
+email-validator==2.2.0
+
+# Cache
+redis>=5.0.0

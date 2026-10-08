@@ -1,4 +1,4 @@
-﻿"""
+"""
 Seed script to load schemes.json into the database.
 Run with: PYTHONPATH=. python scripts/seed.py
 """
@@ -7,7 +7,11 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from pathlib import Path
+
+# Ensure backend/ directory is on sys.path so app.* imports resolve
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine

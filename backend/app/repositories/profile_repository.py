@@ -24,6 +24,7 @@ from typing import Sequence, Type
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import cache, citizen_facts_key
 from app.models.citizen import (
     CitizenMaster,
     DemographicProfile,
@@ -101,6 +102,29 @@ class ProfileRepository:
     # ------------------------------------------------------------------
     # Profile facts
     # ------------------------------------------------------------------
+
+    async def load_all_active_facts(self, citizen_id: uuid.UUID) -> dict[str, Any]:
+        """
+        Bulk fact loader: loads all active (effective_until IS NULL) profile facts
+        for a citizen in a single SQL query.
+        Cached in Redis under vidyasetu:citizen_facts:{citizen_id} (TTL: 60s).
+        Returns an in-memory dictionary of {fact_code: fact_value}.
+        """
+        cache_key = citizen_facts_key(citizen_id)
+        cached = await cache.get(cache_key)
+        if cached is not None and isinstance(cached, dict):
+            return cached
+
+        result = await self.db.execute(
+            select(ProfileFact.fact_code, ProfileFact.fact_value)
+            .where(
+                ProfileFact.citizen_id == citizen_id,
+                ProfileFact.effective_until.is_(None),
+            )
+        )
+        facts_dict = {row[0]: row[1] for row in result.all()}
+        await cache.set(cache_key, facts_dict, ttl=60)
+        return facts_dict
 
     async def get_open_facts(
         self, citizen_id: uuid.UUID, fact_codes: Sequence[str]

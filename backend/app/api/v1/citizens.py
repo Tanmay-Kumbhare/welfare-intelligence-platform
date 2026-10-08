@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,11 @@ from app.schemas.citizen import (
     CitizenUpdateResponse,
 )
 from app.schemas.profile_audit import ProfileAuditResponse
+from app.schemas.education import (
+    EducationRecordCreate,
+    EducationRecordResponse,
+    EducationRecordUpdate,
+)
 from app.services.citizen_service import CitizenService
 from app.services.profile_sync_service import ProfileSyncService
 
@@ -60,15 +65,81 @@ async def update_citizen(
     citizen = await service.update_citizen(citizen_id, data)
     if not citizen:
         raise HTTPException(status_code=404, detail="Citizen not found")
-    # Keep the profile-fact layer in step with the profile edit — the
-    # eligibility engine reads facts, not profile columns, and a direct
-    # edit used to be invisible to it until the next full form submission.
+    # Keep the profile-fact layer in step with the profile edit
     sync = ProfileSyncService(db)
     sync_summary = await sync.sync_facts_from_profile(citizen_id)
     return {
         **_citizen_response_dict(citizen),
         "fact_sync": sync_summary,
     }
+
+
+# ----------------------------------------------------------------------
+# Repeatable Education Records Endpoints
+# ----------------------------------------------------------------------
+
+@router.get("/{citizen_id}/education", response_model=list[EducationRecordResponse])
+async def list_education_records(
+    citizen_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
+) -> Sequence[EducationRecordResponse]:
+    await require_same_citizen(user, citizen_id, db)
+    service = CitizenService(db)
+    return await service.list_education_records(citizen_id)
+
+
+@router.post(
+    "/{citizen_id}/education",
+    response_model=EducationRecordResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_education_record(
+    citizen_id: uuid.UUID,
+    data: EducationRecordCreate,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
+) -> EducationRecordResponse:
+    await require_same_citizen(user, citizen_id, db)
+    service = CitizenService(db)
+    return await service.add_education_record(citizen_id, data)
+
+
+@router.put(
+    "/{citizen_id}/education/{record_id}",
+    response_model=EducationRecordResponse,
+)
+async def update_education_record(
+    citizen_id: uuid.UUID,
+    record_id: uuid.UUID,
+    data: EducationRecordUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
+) -> EducationRecordResponse:
+    await require_same_citizen(user, citizen_id, db)
+    service = CitizenService(db)
+    updated = await service.update_education_record(record_id, citizen_id, data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Education record not found")
+    return updated
+
+
+@router.delete(
+    "/{citizen_id}/education/{record_id}",
+    status_code=status.HTTP_200_OK,
+)
+async def delete_education_record(
+    citizen_id: uuid.UUID,
+    record_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
+) -> Any:
+    await require_same_citizen(user, citizen_id, db)
+    service = CitizenService(db)
+    deleted = await service.delete_education_record(record_id, citizen_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Education record not found")
+    return {"deleted": True, "record_id": str(record_id)}
 
 
 def _citizen_response_dict(citizen) -> dict:

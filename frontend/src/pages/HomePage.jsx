@@ -6,6 +6,7 @@ import Badge from "../components/ui/Badge";
 import SectionHeader from "../components/ui/SectionHeader";
 import { LoadingState, ErrorState, EmptyState } from "../components/ui/StatusStates";
 import CitizenTypeSelector from "../components/CitizenTypeSelector";
+import CategoryCardSection from "../components/CategoryCardSection";
 import { schemeService } from "../services/api";
 import { deriveCategoryCounts } from "../utils/schemeInsights";
 import { categoryLabel } from "../utils/ruleFormat";
@@ -93,6 +94,9 @@ export default function HomePage() {
           </Button>
         </div>
       </div>
+
+      {/* VISUAL CATEGORY SECTION */}
+      <CategoryCardSection schemes={schemes} schemesWithRules={schemeDetails} />
 
       {/* CITIZEN TYPE DISCOVERY */}
       <div className="mb-11">

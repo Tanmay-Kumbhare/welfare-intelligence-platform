@@ -7,10 +7,14 @@ No configuration values are hardcoded here.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_ENV_FILE = _BACKEND_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -20,7 +24,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(_ENV_FILE), ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         # backend/.env carries keys for adjacent subsystems (supabase, redis,
@@ -35,6 +39,16 @@ class Settings(BaseSettings):
     # Accepts both direct (port 5432) and pooler (port 6543) connection strings.
     # Changing connection mode requires only a DATABASE_URL change in .env.
     DATABASE_URL: str
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def assemble_db_url(cls, v: str) -> str:
+        """Ensure asyncpg driver scheme is present for async SQLAlchemy engine."""
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        return v
 
     # ------------------------------------------------------------------
     # Application
@@ -55,6 +69,14 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10
+
+    # ------------------------------------------------------------------
+    # Reference Data Cache & Redis
+    # ------------------------------------------------------------------
+    CACHE_ENABLED: bool = True
+    CACHE_TTL_SECONDS: int = 300
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_CACHE_ENABLED: bool = True
 
     # ------------------------------------------------------------------
     # Google OAuth (configured via environment variables)

@@ -142,8 +142,12 @@ export default function Header() {
   return (
     <header className="bg-paper-raised border-b-[3px] border-accent">
       <div className="max-w-[1040px] mx-auto px-5 sm:px-7 py-4 flex items-center justify-between gap-6 flex-wrap">
-        <NavLink to="/" className="font-display font-semibold text-[22px] tracking-tight text-ink">
-          Vidya<span className="text-accent-ink">Setu</span>
+        <NavLink to="/" className="flex items-center" aria-label="VidyaSetu Home">
+          <img
+            src="/vidyasetu-logo.svg"
+            alt="VidyaSetu - Welfare Intelligence Platform"
+            className="h-10 w-auto object-contain"
+          />
         </NavLink>
 
         <div className="flex items-center gap-3 flex-wrap">

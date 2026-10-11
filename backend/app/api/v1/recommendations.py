@@ -76,6 +76,13 @@ async def get_citizen_recommendations(
         if a.evaluation_details and isinstance(a.evaluation_details, dict):
             rule_match_score = a.evaluation_details.get("rule_match_score")
 
+        from app.services.gap_analysis_service import GapAnalysisService
+        gap_analysis = GapAnalysisService.analyze_gaps(
+            evaluation_details=a.evaluation_details,
+            scheme_documents=scheme_documents,
+            eligibility_result=a.eligibility_result,
+        )
+
         item = RecommendationItem(
             scheme=a.scheme,
             eligibility_result=a.eligibility_result,
@@ -86,6 +93,7 @@ async def get_citizen_recommendations(
             documents=a.scheme.documents,
             document_status=doc_status,
             scheme_documents=scheme_documents,
+            gap_analysis=gap_analysis,
         )
         if a.eligibility_result:
             eligible.append(item)

@@ -73,6 +73,7 @@ class RecommendationItem(BaseModel):
     document_status: Optional[str] = None
     scheme_documents: list[SchemeDocumentStatus] = []
     recommendation_explanation: Optional[str] = None
+    gap_analysis: Optional[Any] = None
 
 
 class RecommendationsResponse(BaseModel):

@@ -72,6 +72,7 @@ class RecommendationItem(BaseModel):
     documents: list[DocumentResponse] = []
     document_status: Optional[str] = None
     scheme_documents: list[SchemeDocumentStatus] = []
+    recommendation_explanation: Optional[str] = None
 
 
 class RecommendationsResponse(BaseModel):

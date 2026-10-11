@@ -92,11 +92,16 @@ async def get_citizen_recommendations(
         else:
             ineligible.append(item)
 
+    from app.services.recommendation_service import rank_recommendations
+
+    eligible_ranked = rank_recommendations(eligible, citizen=citizen)
+    ineligible_ranked = rank_recommendations(ineligible, citizen=citizen)
+
     return RecommendationsResponse(
         citizen_id=citizen_id,
         total_schemes_evaluated=len(assessments),
-        eligible_count=len(eligible),
-        ineligible_count=len(ineligible),
-        eligible_schemes=eligible,
-        ineligible_schemes=ineligible,
+        eligible_count=len(eligible_ranked),
+        ineligible_count=len(ineligible_ranked),
+        eligible_schemes=eligible_ranked,
+        ineligible_schemes=ineligible_ranked,
     )

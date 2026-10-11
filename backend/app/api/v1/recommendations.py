@@ -101,9 +101,16 @@ async def get_citizen_recommendations(
             ineligible.append(item)
 
     from app.services.recommendation_service import rank_recommendations
+    from app.services.alternative_scheme_service import AlternativeSchemeService
 
     eligible_ranked = rank_recommendations(eligible, citizen=citizen)
     ineligible_ranked = rank_recommendations(ineligible, citizen=citizen)
+
+    # Attach alternative scheme suggestions to ineligible schemes
+    AlternativeSchemeService.attach_alternatives_to_recommendations(
+        eligible_items=eligible_ranked,
+        ineligible_items=ineligible_ranked,
+    )
 
     return RecommendationsResponse(
         citizen_id=citizen_id,

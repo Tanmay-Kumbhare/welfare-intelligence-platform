@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -74,6 +74,7 @@ class RecommendationItem(BaseModel):
     scheme_documents: list[SchemeDocumentStatus] = []
     recommendation_explanation: Optional[str] = None
     gap_analysis: Optional[Any] = None
+    alternative_schemes: Optional[List[Any]] = None
 
 
 class RecommendationsResponse(BaseModel):

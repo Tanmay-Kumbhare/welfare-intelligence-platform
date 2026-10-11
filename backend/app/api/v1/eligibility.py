@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,6 +10,7 @@ from app.repositories.assessment_repository import AssessmentRepository
 from app.repositories.citizen_repository import CitizenRepository
 from app.repositories.scheme_repository import SchemeRepository
 from app.schemas.assessment import AssessmentResponse
+from app.schemas.simulation import SimulationInput, SimulationResponse
 from app.services.eligibility_engine import EligibilityEngine
 
 router = APIRouter()
@@ -52,3 +53,32 @@ async def evaluate_citizen_eligibility(
         )
 
     return await assessment_repo.upsert_assessments(assessment_rows)
+
+
+@router.post("/simulate/{citizen_id}", response_model=SimulationResponse)
+async def simulate_citizen_eligibility(
+    citizen_id: uuid.UUID,
+    payload: SimulationInput,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
+) -> Any:
+    """
+    Simulates what-if profile changes for a citizen against all active schemes.
+    Does NOT save changes to the citizen profile, facts, or assessment database.
+    """
+    await require_same_citizen(user, citizen_id, db)
+    citizen_repo = CitizenRepository(db)
+    scheme_repo = SchemeRepository(db)
+
+    citizen = await citizen_repo.get_full_profile(citizen_id)
+    if not citizen:
+        raise HTTPException(status_code=404, detail="Citizen not found")
+
+    schemes = await scheme_repo.get_all_active_for_evaluation()
+
+    from app.services.simulation_service import SimulationService
+    return SimulationService.simulate_citizen_eligibility(
+        citizen=citizen,
+        schemes=schemes,
+        simulation_input=payload,
+    )

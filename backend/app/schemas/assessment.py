@@ -26,6 +26,7 @@ class RuleEvaluationDetail(BaseModel):
     operator: str
     required: str
     passed: bool
+    is_missing: bool = False
     description: Optional[str] = None
 
 
@@ -41,6 +42,11 @@ class EvaluationDetails(BaseModel):
     """Full JSONB evaluation_details structure."""
     overall_result: bool
     group_combining_operator: str
+    rule_match_score: Optional[float] = None
+    total_rules: Optional[int] = None
+    passed_rules_count: Optional[int] = None
+    failed_rules_count: Optional[int] = None
+    missing_rules_count: Optional[int] = None
     groups: list[GroupEvaluationDetail]
 
 
@@ -59,6 +65,7 @@ class RecommendationItem(BaseModel):
     """Single item in a citizen''s recommendations list."""
     scheme: SchemeResponse
     eligibility_result: bool
+    rule_match_score: Optional[float] = None
     reason: Optional[str] = None
     evaluation_details: Optional[dict[str, Any]] = None
     assessment_date: date

@@ -72,9 +72,14 @@ async def get_citizen_recommendations(
         if len(a.scheme.documents) > 0:
             doc_status = "COMPLETE" if is_complete else "MISSING_DOCUMENTS"
 
+        rule_match_score = None
+        if a.evaluation_details and isinstance(a.evaluation_details, dict):
+            rule_match_score = a.evaluation_details.get("rule_match_score")
+
         item = RecommendationItem(
             scheme=a.scheme,
             eligibility_result=a.eligibility_result,
+            rule_match_score=rule_match_score,
             reason=a.reason,
             evaluation_details=a.evaluation_details,
             assessment_date=a.assessment_date,

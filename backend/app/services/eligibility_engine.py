@@ -1,4 +1,4 @@
-﻿"""
+"""
 Eligibility Engine.
 Evaluates deterministic rules against citizen profiles.
 Produces full evaluation details for explainability.
@@ -27,14 +27,26 @@ class EligibilityEngine:
         Returns: (overall_result, evaluation_details_jsonb, reason)
         """
         group_results = []
-        scheme_passed = True  # Will be recalculated
+        total_rules = 0
+        passed_rules_count = 0
+        failed_rules_count = 0
+        missing_rules_count = 0
 
         for group in scheme.rule_groups:
             rule_results = []
             
             for rule in group.rules:
                 actual_value = self._resolve_parameter(citizen, rule.parameter_name)
+                is_missing = actual_value is None
                 passed = self._apply_operator(actual_value, rule.operator, rule.required_value)
+
+                total_rules += 1
+                if passed:
+                    passed_rules_count += 1
+                elif is_missing:
+                    missing_rules_count += 1
+                else:
+                    failed_rules_count += 1
 
                 rule_results.append({
                     "parameter": rule.parameter_name,
@@ -42,6 +54,7 @@ class EligibilityEngine:
                     "operator": rule.operator,
                     "required": rule.required_value,
                     "passed": passed,
+                    "is_missing": is_missing,
                     "description": rule.rule_description,
                 })
 
@@ -62,9 +75,26 @@ class EligibilityEngine:
         else:  # OR
             overall_result = any(g["group_passed"] for g in group_results) if group_results else True
 
+        # Rule Match Score calculation:
+        # Range: 0.0 to 100.0 rounded to 1 decimal place.
+        # Denominator: total_rules evaluated for this scheme.
+        # Numerator: passed_rules_count.
+        # Missing values are NOT counted as passed.
+        # When a scheme has 0 rules: rule_match_score is 0.0 to avoid division by zero or misleading 100%.
+        rule_match_score = (
+            round((passed_rules_count / total_rules) * 100.0, 1)
+            if total_rules > 0
+            else 0.0
+        )
+
         evaluation_details = {
             "overall_result": overall_result,
             "group_combining_operator": scheme.group_combining_operator,
+            "rule_match_score": rule_match_score,
+            "total_rules": total_rules,
+            "passed_rules_count": passed_rules_count,
+            "failed_rules_count": failed_rules_count,
+            "missing_rules_count": missing_rules_count,
             "groups": group_results,
         }
 

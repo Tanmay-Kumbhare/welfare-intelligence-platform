@@ -14,6 +14,7 @@ from app.schemas.citizen import (
     CitizenUpdate,
     CitizenUpdateResponse,
 )
+from app.schemas.profile_audit import ProfileAuditResponse
 from app.services.citizen_service import CitizenService
 from app.services.profile_sync_service import ProfileSyncService
 
@@ -72,3 +73,38 @@ async def update_citizen(
 
 def _citizen_response_dict(citizen) -> dict:
     return CitizenResponse.model_validate(citizen).model_dump()
+
+
+@router.get("/audit/{citizen_id}", response_model=ProfileAuditResponse)
+async def audit_citizen_profile(
+    citizen_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: Any = Depends(get_optional_user),
+) -> Any:
+    """
+    Audits a citizen profile for conflicting facts, stale records,
+    document mismatches, and missing information. Read-only.
+    """
+    await require_same_citizen(user, citizen_id, db)
+
+    from app.repositories.citizen_repository import CitizenRepository
+    from app.repositories.scheme_repository import SchemeRepository
+    from app.services.document_service import DocumentService
+    from app.services.profile_audit_service import ProfileAuditService
+
+    citizen_repo = CitizenRepository(db)
+    citizen = await citizen_repo.get_full_profile(citizen_id)
+    if not citizen:
+        raise HTTPException(status_code=404, detail="Citizen not found")
+
+    scheme_repo = SchemeRepository(db)
+    schemes = await scheme_repo.get_all_active_for_evaluation()
+
+    doc_service = DocumentService(db)
+    documents = await doc_service.get_citizen_documents(citizen_id)
+
+    return ProfileAuditService.audit_citizen_profile(
+        citizen=citizen,
+        schemes=schemes,
+        documents=documents,
+    )

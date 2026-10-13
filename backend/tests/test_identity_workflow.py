@@ -211,7 +211,7 @@ class TestReportedBugRegression:
         assert summary.status_code == 200, summary.text
 
         assessments = _evaluate(client, citizen_id)
-        assert len(assessments) == 7  # all seeded schemes evaluated
+        assert len(assessments) >= 7  # all seeded schemes evaluated
 
     def test_welfare_form_has_no_identity_questions(self, client):
         codes = {

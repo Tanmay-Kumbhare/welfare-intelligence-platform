@@ -32,19 +32,36 @@ export default function RuleEvaluationDetails({ details, failedOnly = false }) {
             <div className="space-y-3">
               {rules.map((rule, index) => {
                 const formatted = formatRule(rule);
+                const isMissing = Boolean(rule.is_missing);
+                const isPassed = Boolean(rule.passed);
+
+                let badgeVariant = "excl";
+                let badgeLabel = "Does not meet requirement";
+                let resultLabel = "Does not meet requirement";
+
+                if (isPassed) {
+                  badgeVariant = "ok";
+                  badgeLabel = "Meets requirement";
+                  resultLabel = "Meets requirement";
+                } else if (isMissing) {
+                  badgeVariant = "neutral";
+                  badgeLabel = "Information not provided";
+                  resultLabel = "Information not provided";
+                }
+
                 return (
                   <div key={`${rule.parameter}-${index}`} className="border-b border-line last:border-0 pb-3 last:pb-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                       <p className="text-sm text-ink mb-0">{parameterLabel(rule.parameter)}</p>
-                      <Badge variant={rule.passed ? "ok" : "excl"}>
-                        {rule.passed ? "Meets requirement" : "Does not meet requirement"}
+                      <Badge variant={badgeVariant}>
+                        {badgeLabel}
                       </Badge>
                     </div>
                     <dl className="grid sm:grid-cols-4 gap-2 text-xs">
                       <div><dt className="text-ink-soft">Parameter</dt><dd className="font-mono text-ink mt-1">{parameterLabel(rule.parameter)}</dd></div>
-                      <div><dt className="text-ink-soft">Your value</dt><dd className="font-mono text-ink mt-1">{describeActualValue(formatted)}</dd></div>
+                      <div><dt className="text-ink-soft">Your value</dt><dd className="font-mono text-ink mt-1">{isMissing && (rule.actual === null || rule.actual === undefined || rule.actual === "") ? "Not provided" : describeActualValue(formatted)}</dd></div>
                       <div><dt className="text-ink-soft">Requirement</dt><dd className="font-mono text-ink mt-1">{describeRequiredValue(formatted)}</dd></div>
-                      <div><dt className="text-ink-soft">Result</dt><dd className="font-mono text-ink mt-1">{rule.passed ? "Meets requirement" : "Does not meet requirement"}</dd></div>
+                      <div><dt className="text-ink-soft">Result</dt><dd className="font-mono text-ink mt-1">{resultLabel}</dd></div>
                     </dl>
                     {rule.description && <p className="text-xs mt-2 mb-0">{rule.description}</p>}
                   </div>

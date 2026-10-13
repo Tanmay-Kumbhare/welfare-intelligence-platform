@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
+from app.database import engine
 from app.main import app
 from app.models.form import (
     FormCondition,
@@ -309,6 +310,7 @@ def _versioned_spec(version: int, question_code: str) -> dict:
 def client():
     with TestClient(app) as c:
         yield c
+    _run(engine.dispose())
 
 
 @pytest.fixture(scope="module")

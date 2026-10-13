@@ -34,6 +34,12 @@ export const citizenService = {
   register: (data) => api.post("/citizens/", data),
   get: (id) => api.get(`/citizens/${id}`),
   update: (id, data) => api.put(`/citizens/${id}`, data),
+  audit: (citizenId) => {
+    if (!citizenId) {
+      return Promise.reject(new Error("Citizen ID is required for profile audit"));
+    }
+    return api.get(`/citizens/audit/${citizenId}`);
+  },
 };
 
 export const authService = {
@@ -56,6 +62,12 @@ export const schemeService = {
 
 export const eligibilityService = {
   evaluate: (citizenId) => api.post(`/eligibility/evaluate/${citizenId}`),
+  simulate: (citizenId, payload) => {
+    if (!citizenId) {
+      return Promise.reject(new Error("Citizen ID is required for simulation"));
+    }
+    return api.post(`/eligibility/simulate/${citizenId}`, payload);
+  },
 };
 
 export const recommendationService = {

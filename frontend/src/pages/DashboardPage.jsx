@@ -4,6 +4,7 @@ import { User, FileText, CheckCircle, Clock, AlertCircle, Search, Settings, XCir
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
+import ProfileAuditAlert from "../components/dashboard/ProfileAuditAlert";
 import { LoadingState, ErrorState } from "../components/ui/StatusStates";
 import { authService, citizenService, recommendationService } from "../services/api";
 import api from "../services/api";
@@ -116,6 +117,9 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-semibold mb-2">Welcome back, {citizen.full_name || "Citizen"}</h1>
         <p className="text-ink-soft">Here is a summary of your current welfare status and pending actions.</p>
       </header>
+
+      {/* Profile Conflict and Stale Fact Audit Alert */}
+      <ProfileAuditAlert citizenId={citizen.citizen_id} />
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">
         {/* Profile Status */}

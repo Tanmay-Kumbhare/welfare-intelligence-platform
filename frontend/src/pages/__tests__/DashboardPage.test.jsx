@@ -1,35 +1,56 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import DashboardPage from '../DashboardPage';
 import { authService, citizenService, recommendationService } from '../../services/api';
 import api from '../../services/api';
 
 // Mock dependencies
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   authService: {
-    me: jest.fn(),
+    me: vi.fn(),
   },
   citizenService: {
-    get: jest.fn(),
+    get: vi.fn(),
+    audit: vi.fn(),
   },
   recommendationService: {
-    getForCitizen: jest.fn(),
+    getForCitizen: vi.fn(),
   },
   __esModule: true,
   default: {
-    get: jest.fn(),
+    get: vi.fn(),
   },
 }));
 
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate,
-}));
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 describe('DashboardPage', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+    citizenService.audit.mockResolvedValue({
+      data: {
+        citizen_id: 'cit-123',
+        audited_at: new Date().toISOString(),
+        summary: {
+          total_issues: 0,
+          confirmed_conflicts_count: 0,
+          possible_conflicts_count: 0,
+          stale_facts_count: 0,
+          missing_information_count: 0,
+          is_healthy: true,
+          summary_message: "Profile is completely consistent and up to date; no conflicts or stale facts found."
+        },
+        issues: []
+      }
+    });
   });
 
   const renderDashboard = () => {
@@ -106,9 +127,7 @@ describe('DashboardPage', () => {
       expect(screen.getByText('2')).toBeInTheDocument(); // Ineligible count
       
       // Documents
-      expect(screen.getByText('1')).toBeInTheDocument(); // Valid
-      expect(screen.getByText('1')).toBeInTheDocument(); // Invalid (Land Record)
-      expect(screen.getByText('1')).toBeInTheDocument(); // Not Uploaded (Income)
+      expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(3); // Valid, Invalid, Not Uploaded
       
       // Missing Docs list
       expect(screen.getByText(/Documents needing attention/i)).toBeInTheDocument();

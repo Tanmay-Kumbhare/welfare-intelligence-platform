@@ -1,7 +1,7 @@
 # PROJECT_STATE.md — Welfare Intelligence Platform (VidyaSetu)
 
-**Status:** V2 complete and checkpointed. Phase 3B not started.
-**Last updated:** 2026-09-21 (pre-Phase-3B checkpoint).
+**Status:** V2 and eligibility-insight features merged. Phase 3B not started.
+**Last updated:** 2026-10-14.
 
 This is the **authoritative implementation-state document**. Every future coding
 agent must read it (see `AGENTS.md`) before changing anything. It deliberately
@@ -153,11 +153,20 @@ suites use transactional rollback or clean up their own fixtures):
 | `test_identity_workflow.py` | identity/ownership regressions |
 | `test_eligibility_engine.py` | engine semantics |
 | `test_eligibility_performance.py` | query-count assertions |
+| `test_gap_analysis.py` | failed criteria, missing profile facts, and document gaps |
+| `test_alternative_schemes.py` | deterministic alternative scheme suggestions |
+| `test_recommendation_ranking.py` | deterministic ranking and rule-match score ordering |
+| `test_simulation.py` | in-memory what-if eligibility comparisons |
+| `test_profile_audit.py` | profile conflict, stale-fact, and missing-information audit |
 
 Frontend (`vitest` + Testing Library, mocked API): form loading/error states,
 dynamic rendering, conditional visibility, draft save/resume, review,
-completion, normalization call, identity-flow regressions. Production build
-(`vite build`) passes.
+completion, normalization call, identity-flow regressions, gap analysis,
+alternative schemes, simulation, profile audit, and results presentation.
+After the 2026-10-14 merge, the six new/affected backend service test files
+passed (48 tests), all 70 frontend tests passed, and `vite build` passed.
+Database-backed identity/forms regression tests were not completed in that
+verification run.
 
 ## 8. IMPLEMENTED — Eligibility performance optimization
 
@@ -179,6 +188,8 @@ Structural DB round-trip reduction (tested, not latency-measured):
   exist but nothing populates them yet.
 - **Document upload is not implemented** — the form's document questions are
   availability flags only.
+- Profile-audit freshness thresholds are operational heuristics, not official
+  or statutory document-validity periods.
 - **Frozen v1 form** contains legacy questions that modern seed validation
   would reject; it is never rewritten.
 - **Frontend test/dev duplication:** React StrictMode is enabled; draft
@@ -224,7 +235,7 @@ findings: raw source content must be preserved verbatim; scheme master must
 hold only canonical curated fields; rule provenance must link every rule to
 its evidence; the engine must stay deterministic.
 
-## 12. PLANNED — Phase 3B–3F (NOT IMPLEMENTED)
+## 12. PLANNED — Phase 3B–3F
 
 `PHASE_3B_TO_3F_IMPLEMENTATION_SPEC.md` is the approved blueprint. Summary:
 
@@ -237,19 +248,26 @@ its evidence; the engine must stay deterministic.
 - **3E — fact registry + deterministic DSL:** rule DSL over the profile-fact
   registry; engine consumes published DSL, remains explainable.
 - **3F — recommendation intelligence:** ranking/explanation layer, separate
-  from eligibility.
+  from eligibility. Deterministic rule-match scoring, recommendation ranking,
+  gap analysis, alternative-scheme suggestions, what-if simulation, and
+  read-only profile auditing are now implemented. These features do not alter
+  stored eligibility outcomes; simulation is in-memory, and ranking remains a
+  presentation layer. This is not completion of all planned Phase 3 work.
 
 **Explicitly NOT IMPLEMENTED anywhere:** live government scheme ingestion,
 automatic crawling, candidate extraction, review/publish workflow, immutable
-published scheme versions, tri-state eligibility evaluation
-(ELIGIBLE / NOT_ELIGIBLE / POTENTIALLY_ELIGIBLE status columns exist but the
-engine still emits boolean results), recommendation intelligence.
+published scheme versions, the published-rule DSL, tri-state eligibility
+evaluation (ELIGIBLE / NOT_ELIGIBLE / POTENTIALLY_ELIGIBLE status columns
+exist but the engine still emits boolean results), and live-source-backed
+recommendations.
 
 ## 13. Next step after this checkpoint
 
-1. Human review of the checkpoint commits (see `git log`), then push.
-2. Begin **Phase 3B only** per `PHASE_3B_TO_3F_IMPLEMENTATION_SPEC.md`
-   §4 (source snapshots and ingestion tables/logic), following `AGENTS.md`.
+1. Complete the database-backed backend regression run for identity, forms,
+   and normalization; the post-merge run was not verified.
+2. Then begin **Phase 3B only** per
+   `PHASE_3B_TO_3F_IMPLEMENTATION_SPEC.md` §4 (source snapshots and ingestion
+   tables/logic), following `AGENTS.md`.
 
 ## 14. API surface (current)
 
@@ -260,8 +278,12 @@ engine still emits boolean results), recommendation intelligence.
 - `/api/v1/forms/submissions/{id}/normalize` — profile normalization
 - `/api/v1/eligibility/{citizen_id}/evaluate` — evaluate all active schemes,
   batch-persist assessments
+- `/api/v1/eligibility/simulate/{citizen_id}` — in-memory what-if evaluation;
+  does not persist profile or assessment changes
+- `/api/v1/citizens/audit/{citizen_id}` — read-only profile audit
 - `/api/v1/schemes/` — scheme catalogue and documents
-- Recommendation endpoints for the results flow
+- `/api/v1/recommendations/{citizen_id}` — ranked recommendations with
+  explanations, gap analysis, and alternative scheme suggestions
 
 ## 15. Migrations
 

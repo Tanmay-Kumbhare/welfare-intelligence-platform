@@ -4,7 +4,11 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_authenticated_user, require_same_citizen
+from app.api.v1.deps import (
+    get_authenticated_user,
+    get_optional_user,
+    require_same_citizen,
+)
 from app.database import get_db
 from app.models.auth import UserAccount
 from app.repositories.assessment_repository import AssessmentRepository

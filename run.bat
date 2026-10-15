@@ -23,6 +23,10 @@ echo                 Starting Welfare Intelligence Platform
 echo ==============================================================================
 echo.
 
+:: Ensure Docker containers (PostgreSQL and Redis) are running
+echo Ensuring database and cache services are running...
+docker compose up -d db redis >nul 2>&1
+
 :: 1. Start Backend using existing virtual environment and uvicorn
 echo Starting Backend Server (FastAPI / Uvicorn on port 8000)...
 if exist "%BACKEND_DIR%\venv\Scripts\activate.bat" (
@@ -40,8 +44,9 @@ echo.
 echo Waiting for servers to initialize...
 ping 127.0.0.1 -n 4 >nul
 
-echo Opening http://localhost:5173 in default browser...
+echo Opening Frontend and Swagger API Docs in default browser...
 start http://localhost:5173
+start http://localhost:8000/docs
 
 echo.
 echo ==============================================================================

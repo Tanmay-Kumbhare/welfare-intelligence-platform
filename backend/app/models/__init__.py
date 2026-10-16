@@ -36,13 +36,18 @@ from app.models.education_record import EducationRecord
 # Phase 1: scheme sources and ingestion infrastructure
 from app.models.scheme_source import (
     CONTENT_TYPES,
+    INGESTION_ITEM_STATUSES,
     PROCESSING_STATUSES,
+    RESOURCE_STATUSES,
+    RESOURCE_TYPES,
     SCHEME_SOURCE_TYPES,
+    SchemeIngestionItem,
     SchemeIngestionRun,
     SchemeRuleProvenance,
     SchemeSource,
     SchemeSourceContent,
     SchemeSourceDocument,
+    SchemeSourceResource,
 )
 
 # Auth models (added after the existing domain models)
@@ -90,6 +95,12 @@ __all__ = [
     "SchemeSourceContent",
     "SchemeRuleProvenance",
     "SchemeIngestionRun",
+    # Phase 3B: resources and ingestion items
+    "SchemeSourceResource",
+    "SchemeIngestionItem",
+    "RESOURCE_TYPES",
+    "RESOURCE_STATUSES",
+    "INGESTION_ITEM_STATUSES",
     "SCHEME_SOURCE_TYPES",
     "CONTENT_TYPES",
     "PROCESSING_STATUSES",

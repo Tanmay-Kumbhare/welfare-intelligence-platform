@@ -1,288 +1,400 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
-import { ErrorState, LoadingState } from "../../components/ui/StatusStates";
-import { api } from "../../services/api";
+import Select from "../../components/ui/Select";
+import Badge from "../../components/ui/Badge";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ui/StatusStates";
+import ConfirmDialog from "../../components/admin/ConfirmDialog";
+import useAdminDraft from "../../components/admin/useAdminDraft";
+import { extractApiErrorMessage } from "../../utils/apiError";
+import { adminService } from "../../services/api";
+import {
+  APPLICATION_WINDOW_TYPES,
+  GROUP_OPERATORS,
+  SCHEME_CATEGORIES,
+  SCHEME_PERSONAS,
+  SCHEME_SOURCE_TYPES,
+  SCHEME_STATUSES,
+} from "../../components/admin/rulesVocabulary";
 
-function RuleList({ schemeId }) {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const [linkingRule, setLinkingRule] = useState(null);
-  const [sentences, setSentences] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResult, setSearchResult] = useState(null);
-  const [busy, setBusy] = useState(false);
+const STATUS_BADGE_VARIANT = { ACTIVE: "ok", INACTIVE: "excl" };
 
-  const load = useCallback(() => {
-    api
-      .get(`/admin/schemes/${schemeId}/rules-with-provenance`)
-      .then((response) => setData(response.data))
-      .catch(() => setError("Could not load rules."));
-  }, [schemeId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const openPicker = async (rule) => {
-    setLinkingRule(rule);
-    setSearchQuery("");
-    setSearchResult(null);
-    setError("");
-    try {
-      // The backend picks the latest snapshot document for the scheme.
-      const response = await api.get(
-        `/admin/provenance/schemes/${schemeId}/latest-document-sentences`
-      );
-      setSentences(response.data);
-      setSearchResult(response.data);
-    } catch {
-      setError("No fetched snapshot available. Fetch a source first, then link rules.");
-    }
-  };
-
-  const runSearch = async (q) => {
-    if (!sentences) return;
-    try {
-      const response = await api.get(
-        `/admin/provenance/documents/${sentences.source_document_id}/sentences`,
-        { params: q ? { query: q } : {} }
-      );
-      setSearchResult(response.data);
-    } catch {
-      setError("Sentence search failed.");
-    }
-  };
-
-  const linkSentence = async (rule, index, text) => {
-    setBusy(true);
-    setError("");
-    try {
-      await api.post(
-        `/admin/provenance/rules/${rule.rule_id}/link?source_document_id=${sentences.source_document_id}&sentence_index=${index}`,
-        {} // SentenceSearchQuery body required by the endpoint contract
-      );
-      setLinkingRule(null);
-      setSentences(null);
-      load();
-    } catch (requestError) {
-      setError(requestError?.response?.data?.detail || "Linking failed.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const verifyLink = async (rule, provenanceId) => {
-    setBusy(true);
-    try {
-      await api.post(`/admin/provenance/rules/${rule.rule_id}/links/${provenanceId}/verify`);
-      load();
-    } catch (requestError) {
-      setError(requestError?.response?.data?.detail || "Verify failed.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (error && !data) return <p className="text-sm text-excl-ink mt-2">{error}</p>;
-  if (!data) return <p className="text-sm text-ink-soft mt-2">Loading rules…</p>;
-  if (data.rules.length === 0) return <p className="text-sm text-ink-soft mt-2">No rules defined.</p>;
-
-  return (
-    <div className="mt-3 space-y-2">
-      {data.rules.map((rule) => {
-        const p = rule.provenance;
-        return (
-          <div key={rule.rule_id} className="border border-line rounded-sm p-3 bg-paper">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <p className="text-xs text-ink-soft">
-                <span className="text-ink font-mono">{rule.parameter_name}</span>{" "}
-                {rule.operator.replace(/_/g, " ").toLowerCase()} {" "}
-                <span className="text-ink font-mono">{rule.required_value}</span>
-                {rule.rule_description && <span> — {rule.rule_description}</span>}
-              </p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="ghost" onClick={() => (linkingRule?.rule_id === rule.rule_id ? (setLinkingRule(null), setSentences(null)) : openPicker(rule))}>
-                  {p ? "Re-link source" : "Link source"}
-                </Button>
-                {p && p.verification_status === "PENDING" && (
-                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => verifyLink(rule, p.rule_provenance_id)}>
-                    Verify citation
-                  </Button>
-                )}
-              </div>
-            </div>
-            {p ? (
-              <div className="mt-2 border-l-2 border-accent pl-3 py-1">
-                <p className="text-xs text-ink italic">“{p.source_text}”</p>
-                <p className="text-[11px] text-ink-soft mt-1">
-                  {p.document_url} · {p.verification_status}
-                  {p.verified_at ? ` · verified ${new Date(p.verified_at).toLocaleString()}` : ""}
-                </p>
-              </div>
-            ) : (
-              <p className="text-[11px] text-ink-soft mt-1.5 italic">
-                No source citation linked yet — this rule is not defensible against the official source.
-              </p>
-            )}
-
-            {linkingRule?.rule_id === rule.rule_id && sentences && (
-              <div className="mt-3 border border-line rounded-sm p-3 bg-white">
-                <div className="flex gap-2 mb-2">
-                  <input
-                    className="flex-1 text-sm px-3 py-2 border border-line rounded-sm"
-                    placeholder='Search the snapshot, e.g. "income tax" or "land holding"'
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && runSearch(searchQuery)}
-                  />
-                  <Button size="sm" onClick={() => runSearch(searchQuery)}>Search</Button>
-                </div>
-                <p className="text-[11px] text-ink-soft mb-2">
-                  {searchResult
-                    ? `${searchResult.matches.length} of ${searchResult.total_sentences} sentences${searchQuery && searchResult.query ? ` matching “${searchQuery}”` : ""}`
-                    : "Loading sentences…"}
-                </p>
-                <div className="max-h-56 overflow-auto space-y-1.5">
-                  {(searchResult?.matches || []).map((match) => (
-                    <button
-                      key={match.index}
-                      type="button"
-                      disabled={busy}
-                      className="w-full text-left text-xs p-2 border border-line rounded-sm hover:bg-accent-tint"
-                      onClick={() => linkSentence(rule, match.index, match.text)}
-                    >
-                      <span className="text-ink-soft font-mono mr-2">[{match.index}]</span>
-                      {match.text}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-      {error && <p className="text-xs text-excl-ink">{error}</p>}
-      <p className="text-xs text-ink-soft italic">
-        Rules are read-only — only their source citations are managed here.
-        A citation must be verified by an admin before it is defensible.
-      </p>
-    </div>
-  );
+/** ISO date (YYYY-MM-DD) or "" — client-side affordance only. */
+function isValidIsoDate(value) {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
 }
 
-function SchemeRow({ scheme, onSaved }) {
-  const [editing, setEditing] = useState(false);
-  const [showRules, setShowRules] = useState(false);
-  const [draft, setDraft] = useState({
-    description: scheme.description || "",
-    benefit_description: scheme.benefit_description || "",
-    official_source_url: scheme.official_source_url || "",
-    application_url: scheme.application_url || "",
-    status: scheme.status || "ACTIVE",
-  });
+export function CreateSchemeForm({ onCreated }) {
+  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const save = async () => {
+  const { fields, setField, dirty, reset } = useAdminDraft({
+    scheme_name: "",
+    department_name: "",
+    scheme_category: "EDUCATION",
+    target_persona: "STUDENT",
+    description: "",
+    benefit_description: "",
+    start_date: "",
+    end_date: "",
+    status: "ACTIVE",
+    official_source_url: "",
+    application_url: "",
+    official_scheme_identifier: "",
+    source_type: "MANUAL_SEED",
+    source_name: "",
+    application_window_type: "",
+    source_url: "",
+    group_combining_operator: "AND",
+  });
+
+  const fieldErrors = {};
+  if (!fields.scheme_name.trim()) {
+    fieldErrors.scheme_name = "Scheme name is required";
+  } else if (fields.scheme_name.length > 255) {
+    fieldErrors.scheme_name = "Must be at most 255 characters";
+  }
+  if (!isValidIsoDate(fields.start_date)) {
+    fieldErrors.start_date = "Use YYYY-MM-DD";
+  }
+  if (!isValidIsoDate(fields.end_date)) {
+    fieldErrors.end_date = "Use YYYY-MM-DD";
+  }
+  if (
+    isValidIsoDate(fields.start_date) &&
+    isValidIsoDate(fields.end_date) &&
+    fields.start_date &&
+    fields.end_date &&
+    fields.end_date < fields.start_date
+  ) {
+    fieldErrors.end_date = "End date must not be before the start date";
+  }
+
+  const canSubmit =
+    !saving &&
+    fields.scheme_name.trim() &&
+    Object.keys(fieldErrors).length === 0;
+
+  if (!open) {
+    return (
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        + Create scheme
+      </Button>
+    );
+  }
+
+  const create = async () => {
     setSaving(true);
     setError("");
     try {
-      await api.patch(`/admin/schemes/${scheme.scheme_id}`, draft);
-      setEditing(false);
-      onSaved();
+      // Send only non-empty optional strings; empty date strings must not
+      // become ISO-date validation errors on the server.
+      const payload = {};
+      for (const [key, value] of Object.entries(fields)) {
+        if (value !== "") payload[key] = value;
+      }
+      const response = await adminService.createScheme(payload);
+      setOpen(false);
+      onCreated(response.data);
+      // Fresh empty draft for the next creation (never leaks the old values).
+      reset();
     } catch (requestError) {
-      setError(requestError?.response?.data?.detail || "Save failed.");
+      setError(extractApiErrorMessage(requestError, "Could not create scheme."));
     } finally {
       setSaving(false);
     }
   };
+
+  const cancel = () => {
+    if (dirty && !window.confirm("Discard unsaved scheme details?")) return;
+    setOpen(false);
+    reset();
+    setError("");
+  };
+
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <h3 className="text-lg text-ink">Create a scheme</h3>
+        <Button variant="ghost" size="sm" onClick={cancel}>
+          Close
+        </Button>
+      </div>
+      <p className="text-xs text-ink-soft mb-4 max-w-[70ch]">
+        Creates curated scheme metadata only — no eligibility rules and no
+        required documents yet. An active scheme with zero rules is evaluated
+        as not eligible for citizens until rules are added in the scheme's
+        detail view. Nothing here claims the scheme was verified against
+        official sources — that is a separate deliberate action.
+      </p>
+      {error && <p className="text-sm text-excl-ink mb-3">{error}</p>}
+      <div className="grid md:grid-cols-2 gap-x-5">
+        <Input
+          id="new-scheme-name"
+          label="Scheme name"
+          required
+          value={fields.scheme_name}
+          error={fieldErrors.scheme_name}
+          onChange={(e) => setField("scheme_name", e.target.value)}
+        />
+        <Input
+          id="new-scheme-department"
+          label="Department"
+          value={fields.department_name}
+          onChange={(e) => setField("department_name", e.target.value)}
+        />
+        <Select
+          id="new-scheme-category"
+          label="Category"
+          value={fields.scheme_category}
+          onChange={(e) => setField("scheme_category", e.target.value)}
+        >
+          {SCHEME_CATEGORIES.map((category) => (
+            <option key={category} value={category}>{category}</option>
+          ))}
+        </Select>
+        <Select
+          id="new-scheme-persona"
+          label="Target persona"
+          value={fields.target_persona}
+          onChange={(e) => setField("target_persona", e.target.value)}
+        >
+          {SCHEME_PERSONAS.map((persona) => (
+            <option key={persona} value={persona}>{persona}</option>
+          ))}
+        </Select>
+        <div className="md:col-span-2">
+          <Input
+            id="new-scheme-description"
+            label="Description"
+            value={fields.description}
+            onChange={(e) => setField("description", e.target.value)}
+          />
+        </div>
+        <div className="md:col-span-2">
+          <Input
+            id="new-scheme-benefit"
+            label="Benefit description"
+            value={fields.benefit_description}
+            onChange={(e) => setField("benefit_description", e.target.value)}
+          />
+        </div>
+        <Input
+          id="new-scheme-start"
+          label="Start date"
+          type="date"
+          hint="ISO date — leave empty when unknown"
+          value={fields.start_date}
+          error={fieldErrors.start_date}
+          onChange={(e) => setField("start_date", e.target.value)}
+        />
+        <Input
+          id="new-scheme-end"
+          label="End date"
+          type="date"
+          value={fields.end_date}
+          error={fieldErrors.end_date}
+          onChange={(e) => setField("end_date", e.target.value)}
+        />
+        <Select
+          id="new-scheme-status"
+          label="Status"
+          value={fields.status}
+          onChange={(e) => setField("status", e.target.value)}
+        >
+          {SCHEME_STATUSES.map((status) => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </Select>
+        <Select
+          id="new-scheme-window"
+          label="Application window type"
+          hint="Leave empty when unknown"
+          value={fields.application_window_type}
+          onChange={(e) => setField("application_window_type", e.target.value)}
+        >
+          <option value="">— not specified —</option>
+          {APPLICATION_WINDOW_TYPES.map((windowType) => (
+            <option key={windowType} value={windowType}>{windowType}</option>
+          ))}
+        </Select>
+        <Input
+          id="new-scheme-official-url"
+          label="Official source URL"
+          type="url"
+          hint="https://…"
+          value={fields.official_source_url}
+          onChange={(e) => setField("official_source_url", e.target.value)}
+        />
+        <Input
+          id="new-scheme-apply-url"
+          label="Application URL"
+          type="url"
+          hint="https://…"
+          value={fields.application_url}
+          onChange={(e) => setField("application_url", e.target.value)}
+        />
+        <Select
+          id="new-scheme-source-type"
+          label="Source type (provenance)"
+          hint="MANUAL_SEED is the honest default for hand-curated records"
+          value={fields.source_type}
+          onChange={(e) => setField("source_type", e.target.value)}
+        >
+          {SCHEME_SOURCE_TYPES.map((sourceType) => (
+            <option key={sourceType} value={sourceType}>{sourceType}</option>
+          ))}
+        </Select>
+        <Input
+          id="new-scheme-source-name"
+          label="Source name"
+          value={fields.source_name}
+          onChange={(e) => setField("source_name", e.target.value)}
+        />
+        <Input
+          id="new-scheme-source-url"
+          label="Source URL"
+          type="url"
+          value={fields.source_url}
+          onChange={(e) => setField("source_url", e.target.value)}
+        />
+        <Input
+          id="new-scheme-identifier"
+          label="Official scheme identifier"
+          hint="As named by the authority, when known"
+          value={fields.official_scheme_identifier}
+          onChange={(e) => setField("official_scheme_identifier", e.target.value)}
+        />
+        <Select
+          id="new-scheme-combining"
+          label="Group combining operator"
+          hint="How the scheme's eligibility groups combine (eligible if AND: all groups pass / OR: any group passes)"
+          value={fields.group_combining_operator}
+          onChange={(e) => setField("group_combining_operator", e.target.value)}
+        >
+          {GROUP_OPERATORS.map((operator) => (
+            <option key={operator} value={operator}>{operator}</option>
+          ))}
+        </Select>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <Button onClick={create} disabled={!canSubmit}>
+          {saving ? "Creating…" : "Create scheme"}
+        </Button>
+        <Button variant="secondary" onClick={cancel}>
+          Cancel
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+export function SchemeRow({ scheme, onChanged, onError }) {
+  const [confirming, setConfirming] = useState(null); // null | "archive" | "restore"
+  const [busy, setBusy] = useState(false);
+  const [rowError, setRowError] = useState("");
+
+  const runToggle = async () => {
+    setBusy(true);
+    setRowError("");
+    try {
+      if (confirming === "archive") {
+        await adminService.archiveScheme(scheme.scheme_id);
+      } else {
+        await adminService.restoreScheme(scheme.scheme_id);
+      }
+      setConfirming(null);
+      onChanged();
+    } catch (requestError) {
+      const message = extractApiErrorMessage(requestError, "Action failed.");
+      setRowError(message);
+      onError?.(message);
+      setConfirming(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const active = scheme.status === "ACTIVE";
 
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg text-ink">{scheme.scheme_name}</h3>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-sm ${
-                scheme.status === "ACTIVE"
-                  ? "bg-ok-tint text-ok-ink"
-                  : "bg-excl-tint text-excl-ink"
-              }`}
+            <Link
+              to={`/admin/schemes/${scheme.scheme_id}`}
+              className="text-lg text-accent-ink hover:underline"
             >
+              {scheme.scheme_name}
+            </Link>
+            <Badge variant={STATUS_BADGE_VARIANT[scheme.status] || "neutral"}>
               {scheme.status}
-            </span>
+            </Badge>
+            {scheme.scheme_category && (
+              <Badge pill>{scheme.scheme_category}</Badge>
+            )}
+            {scheme.target_persona && <Badge pill>{scheme.target_persona}</Badge>}
           </div>
           <p className="text-xs text-ink-soft mt-1">
-            {scheme.department_name || "—"} · {scheme.rule_count ?? "?"} rules
+            {scheme.department_name || "No department recorded"} ·{" "}
+            {scheme.rule_count ?? 0} rule{(scheme.rule_count ?? 0) === 1 ? "" : "s"} ·{" "}
+            {(scheme.rule_count ?? 0) === 0 && active ? (
+              <span className="text-accent-ink">no eligibility rules yet</span>
+            ) : null}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setShowRules((v) => !v)}>
-            {showRules ? "Hide rules" : "View rules"}
+          <Button size="sm" variant="ghost" to={`/admin/schemes/${scheme.scheme_id}`}>
+            Open detail
           </Button>
           <Button
             size="sm"
-            variant={editing ? "secondary" : "primary"}
-            onClick={() => (editing ? save() : setEditing(true))}
-            disabled={saving}
+            variant={active ? "secondary" : "primary"}
+            onClick={() => setConfirming(active ? "archive" : "restore")}
           >
-            {editing ? (saving ? "Saving…" : "Save") : "Edit metadata"}
+            {active ? "Archive" : "Restore"}
           </Button>
         </div>
       </div>
 
-      {error && <p className="text-sm text-excl-ink mt-3">{error}</p>}
+      {rowError && <p className="text-sm text-excl-ink mt-3">{rowError}</p>}
 
-      {editing ? (
-        <div className="mt-4 grid md:grid-cols-2 gap-x-5">
-          <div className="md:col-span-2">
-            <Input
-              id={`desc-${scheme.scheme_id}`}
-              label="Description"
-              value={draft.description}
-              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            />
-          </div>
-          <Input
-            id={`benefit-${scheme.scheme_id}`}
-            label="Benefit description"
-            value={draft.benefit_description}
-            onChange={(e) => setDraft({ ...draft, benefit_description: e.target.value })}
-          />
-          <Input
-            id={`source-${scheme.scheme_id}`}
-            label="Official source URL"
-            value={draft.official_source_url}
-            onChange={(e) => setDraft({ ...draft, official_source_url: e.target.value })}
-          />
-          <Input
-            id={`apply-${scheme.scheme_id}`}
-            label="Application URL"
-            value={draft.application_url}
-            onChange={(e) => setDraft({ ...draft, application_url: e.target.value })}
-          />
-          <label className="block text-[13px] font-medium text-ink mb-1.5">
-            Status
-            <select
-              value={draft.status}
-              onChange={(e) => setDraft({ ...draft, status: e.target.value })}
-              className="mt-1.5 w-full font-sans text-sm px-3 py-2.5 bg-white text-ink border border-line rounded-sm"
-            >
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="INACTIVE">INACTIVE</option>
-            </select>
-          </label>
-        </div>
-      ) : (
-        scheme.description && (
-          <p className="text-sm text-ink-soft mt-3 max-w-[70ch]">{scheme.description}</p>
-        )
+      {confirming && (
+        <ConfirmDialog
+          danger={confirming === "archive"}
+          title={confirming === "archive" ? "Archive this scheme?" : "Restore this scheme?"}
+          busy={busy}
+          onConfirm={runToggle}
+          onCancel={() => setConfirming(null)}
+          body={
+            <>
+              <p>
+                {confirming === "archive" ? (
+                  <>
+                    <strong>{scheme.scheme_name}</strong> becomes INACTIVE and
+                    disappears from all citizen-facing listings.
+                  </>
+                ) : (
+                  <>
+                    <strong>{scheme.scheme_name}</strong> becomes ACTIVE and is
+                    visible to citizens again.
+                  </>
+                )}
+              </p>
+              <p>
+                Reversible. Assessments, source documents and provenance are
+                never touched by archive/restore.
+              </p>
+            </>
+          }
+        />
       )}
-
-      {showRules && <RuleList schemeId={scheme.scheme_id} />}
     </Card>
   );
 }
@@ -290,13 +402,17 @@ function SchemeRow({ scheme, onSaved }) {
 export default function AdminSchemesPage() {
   const [schemes, setSchemes] = useState(null);
   const [error, setError] = useState("");
+  const [bannerError, setBannerError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const load = useCallback(() => {
-    api
-      .get("/admin/schemes")
+    adminService
+      .listSchemes()
       .then((response) => setSchemes(response.data))
       .catch((requestError) =>
-        setError(requestError?.response?.data?.detail || "Could not load schemes.")
+        setError(extractApiErrorMessage(requestError, "Could not load schemes."))
       );
   }, []);
 
@@ -304,28 +420,113 @@ export default function AdminSchemesPage() {
     load();
   }, [load]);
 
-  if (error && !schemes) {
-    return <ErrorState title="Unable to load schemes" message={error} />;
-  }
-  if (!schemes) {
-    return <LoadingState label="Loading schemes..." />;
-  }
+  // The list API returns the full catalogue without server-side filters, so
+  // search/filter are local projections — not invented backend behaviour.
+  const visible = (schemes || []).filter((scheme) => {
+    if (statusFilter !== "ALL" && scheme.status !== statusFilter) return false;
+    if (!search.trim()) return true;
+    const haystack = [
+      scheme.scheme_name,
+      scheme.department_name,
+      scheme.scheme_category,
+      scheme.benefit_description,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(search.trim().toLowerCase());
+  });
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-[30px] mb-2">Schemes</h1>
-        <p className="max-w-[60ch]">
-          Metadata is admin-editable. Eligibility rules are visible but
-          read-only — they change only through the reviewed ingestion
-          workflow, never by direct edits.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-[30px] mb-2">Schemes</h1>
+          <p className="max-w-[60ch]">
+            Full catalogue — active and archived. Metadata editing, rules,
+            required documents, sources and verification live in each scheme's
+            detail view.
+          </p>
+        </div>
+        <CreateSchemeForm
+          onCreated={(created) => {
+            setActionNotice(
+              `Scheme “${created.scheme_name}” created — open it to add rules and required documents.`
+            );
+            load();
+          }}
+        />
       </div>
-      <div className="space-y-4">
-        {schemes.map((scheme) => (
-          <SchemeRow key={scheme.scheme_id} scheme={scheme} onSaved={load} />
-        ))}
+
+      {actionNotice && (
+        <div className="mb-4 border border-ok-tint bg-ok-tint/40 text-ok-ink text-sm rounded-sm p-3 flex justify-between gap-3">
+          <span>{actionNotice}</span>
+          <button
+            type="button"
+            className="text-xs underline"
+            onClick={() => setActionNotice("")}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {bannerError && <p className="text-sm text-excl-ink mb-4">{bannerError}</p>}
+
+      <div className="flex gap-3 items-end mb-5 flex-wrap">
+        <div className="w-full md:w-72">
+          <Input
+            id="scheme-search"
+            label="Search"
+            placeholder="Name, department, category…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select
+          id="scheme-status-filter"
+          label="Status"
+          className="w-44"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="ALL">ALL</option>
+          {SCHEME_STATUSES.map((status) => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </Select>
+        {schemes && (
+          <p className="text-xs text-ink-soft pb-6">
+            {visible.length} of {schemes.length} scheme
+            {schemes.length === 1 ? "" : "s"} shown
+          </p>
+        )}
       </div>
+
+      {error && !schemes ? (
+        <ErrorState title="Unable to load schemes" message={error} onRetry={load} />
+      ) : !schemes ? (
+        <LoadingState label="Loading schemes..." />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          title={schemes.length === 0 ? "No schemes yet" : "No schemes match"}
+          message={
+            schemes.length === 0
+              ? "Create the first scheme above."
+              : "Adjust the search or status filter."
+          }
+        />
+      ) : (
+        <div className="space-y-4">
+          {visible.map((scheme) => (
+            <SchemeRow
+              key={scheme.scheme_id}
+              scheme={scheme}
+              onChanged={load}
+              onError={setBannerError}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

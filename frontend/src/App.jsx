@@ -27,6 +27,7 @@ const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
 const AdminSchemesPage = lazy(() => import("./pages/admin/AdminSchemesPage"));
 const AdminSubmissionsPage = lazy(() => import("./pages/admin/AdminSubmissionsPage"));
 const AdminSourcesPage = lazy(() => import("./pages/admin/AdminSourcesPage"));
+const AdminSchemeDetailPage = lazy(() => import("./pages/admin/AdminSchemeDetailPage"));
 
 function RouteLoader() {
   return (
@@ -71,6 +72,7 @@ function App() {
             <Route index element={<AdminOverviewPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="schemes" element={<AdminSchemesPage />} />
+            <Route path="schemes/:id" element={<AdminSchemeDetailPage />} />
             <Route path="submissions" element={<AdminSubmissionsPage />} />
             <Route path="sources" element={<AdminSourcesPage />} />
           </Route>

@@ -116,8 +116,16 @@ export const citizenService = {
     invalidateClientCache("/auth/me");
     return res;
   },
-  get: (id) => cachedGet(api, `/citizens/${id}`),
+  get: (id) => {
+    if (!id || id === "null" || id === "undefined") {
+      return Promise.reject(new Error("Invalid citizen ID"));
+    }
+    return cachedGet(api, `/citizens/${id}`);
+  },
   update: async (id, data) => {
+    if (!id || id === "null" || id === "undefined") {
+      return Promise.reject(new Error("Invalid citizen ID"));
+    }
     const res = await api.put(`/citizens/${id}`, data);
     invalidateClientCache(`/citizens/${id}`);
     invalidateClientCache("/auth/me");
@@ -148,6 +156,61 @@ export const citizenService = {
 };
 
 export const adminService = {
+  stats: () => api.get("/admin/stats"),
+  listSchemes: () => api.get("/admin/schemes"),
+  schemeDetail: (schemeId) => api.get(`/admin/schemes/${schemeId}`),
+  createScheme: (data) => api.post("/admin/schemes", data),
+  updateScheme: (schemeId, data) => api.patch(`/admin/schemes/${schemeId}`, data),
+  archiveScheme: (schemeId) => api.post(`/admin/schemes/${schemeId}/archive`),
+  restoreScheme: (schemeId) => api.post(`/admin/schemes/${schemeId}/restore`),
+  deleteScheme: (schemeId) => api.delete(`/admin/schemes/${schemeId}`),
+  verifyScheme: (schemeId, verifiedOn) =>
+    api.post(`/admin/schemes/${schemeId}/verify`, { verified_on: verifiedOn }),
+  listRuleGroups: (schemeId) => api.get(`/admin/schemes/${schemeId}/rule-groups`),
+  createRuleGroup: (schemeId, data) =>
+    api.post(`/admin/schemes/${schemeId}/rule-groups`, data),
+  updateRuleGroup: (schemeId, groupId, data) =>
+    api.patch(`/admin/schemes/${schemeId}/rule-groups/${groupId}`, data),
+  deleteRuleGroup: (schemeId, groupId) =>
+    api.delete(`/admin/schemes/${schemeId}/rule-groups/${groupId}`),
+  setGroupCombiningOperator: (schemeId, groupCombiningOperator) =>
+    api.patch(`/admin/schemes/${schemeId}/group-combining-operator`, {
+      group_combining_operator: groupCombiningOperator,
+    }),
+  createRule: (schemeId, data) => api.post(`/admin/schemes/${schemeId}/rules`, data),
+  updateRule: (schemeId, ruleId, data) =>
+    api.patch(`/admin/schemes/${schemeId}/rules/${ruleId}`, data),
+  deleteRule: (schemeId, ruleId) =>
+    api.delete(`/admin/schemes/${schemeId}/rules/${ruleId}`),
+  listDocuments: (schemeId) => api.get(`/admin/schemes/${schemeId}/documents`),
+  createDocument: (schemeId, data) =>
+    api.post(`/admin/schemes/${schemeId}/documents`, data),
+  updateDocument: (schemeId, documentId, data) =>
+    api.patch(`/admin/schemes/${schemeId}/documents/${documentId}`, data),
+  deleteDocument: (schemeId, documentId) =>
+    api.delete(`/admin/schemes/${schemeId}/documents/${documentId}`),
+  listSchemeSourceDocuments: (schemeId) =>
+    api.get(`/admin/schemes/${schemeId}/source-documents`),
+  linkSchemeSourceDocument: (schemeId, sourceDocumentId) =>
+    api.put(`/admin/schemes/${schemeId}/source-documents/${sourceDocumentId}`),
+  unlinkSchemeSourceDocument: (schemeId, sourceDocumentId) =>
+    api.delete(`/admin/schemes/${schemeId}/source-documents/${sourceDocumentId}`),
+  rulesWithProvenance: (schemeId) =>
+    api.get(`/admin/schemes/${schemeId}/rules-with-provenance`),
+  latestDocumentSentences: (schemeId, query) =>
+    api.get(`/admin/provenance/schemes/${schemeId}/latest-document-sentences`, {
+      params: query ? { query } : {},
+    }),
+  documentSentences: (sourceDocumentId, query) =>
+    api.get(`/admin/provenance/documents/${sourceDocumentId}/sentences`, {
+      params: query ? { query } : {},
+    }),
+  linkRuleProvenance: (ruleId, sourceDocumentId, sentenceIndex) =>
+    api.post(`/admin/provenance/rules/${ruleId}/link`, {}, {
+      params: { source_document_id: sourceDocumentId, sentence_index: sentenceIndex },
+    }),
+  verifyRuleProvenance: (ruleId, provenanceId) =>
+    api.post(`/admin/provenance/rules/${ruleId}/links/${provenanceId}/verify`),
   updateFormQuestion: async (questionId, data) => {
     const res = await api.patch(`/admin/forms/questions/${questionId}`, data);
     invalidateClientCache("/forms");

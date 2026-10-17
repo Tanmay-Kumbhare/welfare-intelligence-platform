@@ -89,7 +89,7 @@ class AuthService:
 
         return user, citizen
 
-    async def login(self, email: str, password: str) -> tuple[UserAccount, str]:
+    async def login(self, email: str, password: str) -> tuple[UserAccount, str, list[str]]:
         user = await self.users.get_by_email(email)
         if user is None:
             raise InvalidCredentialsError()
@@ -104,13 +104,14 @@ class AuthService:
         if not verify_password(password, user.password_hash):
             raise InvalidCredentialsError()
 
+        roles = await self.users.get_roles(user.user_id)
         token = issue_raw_token()
         await self.users.create_session(
             user.user_id,
             token,
             ttl_hours=DEFAULT_SESSION_TTL_HOURS,
         )
-        return user, token
+        return user, token, roles
 
     async def authenticate_google_user(
         self,
@@ -267,6 +268,10 @@ class AuthService:
 
     async def get_citizen_for_user(self, user: UserAccount) -> CitizenMaster | None:
         return await self.citizens.get_by_owning_user(user.user_id)
+
+    async def get_roles_for_user(self, user: UserAccount) -> list[str]:
+        """Return the role names held by the user (e.g. ["ADMIN"], [])."""
+        return await self.users.get_roles(user.user_id)
 
     async def _create_citizen_profile(
         self,

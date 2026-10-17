@@ -18,6 +18,8 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -27,6 +29,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -51,6 +54,23 @@ CONTENT_TYPES = ("RAW", "NORMALIZED", "EXTRACTED_TEXT")
 
 # Canonical processing statuses.
 PROCESSING_STATUSES = ("PENDING", "PROCESSING", "PROCESSED", "FAILED")
+
+# Canonical resource types for tbl_scheme_source_resource (frozen Task 1E).
+RESOURCE_TYPES = (
+    "CATALOGUE_PAGE",
+    "SCHEME_PAGE",
+    "PDF",
+    "APPLICATION_PORTAL",
+    "API_ENDPOINT",
+    "DOCUMENT_ARCHIVE",
+    "OTHER",
+)
+
+# Canonical resource statuses (frozen Task 1E).
+RESOURCE_STATUSES = ("ACTIVE", "INACTIVE", "RETIRED")
+
+# Canonical ingestion-item statuses (frozen Task 1E).
+INGESTION_ITEM_STATUSES = ("PENDING", "RUNNING", "SUCCEEDED", "FAILED", "SKIPPED")
 
 
 class SchemeSource(Base):
@@ -81,6 +101,10 @@ class SchemeSource(Base):
     )
 
     documents: Mapped[list["SchemeSourceDocument"]] = relationship(
+        back_populates="source",
+        cascade="all, delete-orphan",
+    )
+    resources: Mapped[list["SchemeSourceResource"]] = relationship(
         back_populates="source",
         cascade="all, delete-orphan",
     )
@@ -139,7 +163,25 @@ class SchemeSourceDocument(Base):
         nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # --- Phase 3B (migration 0008): resource link + fetch evidence. All
+    # nullable — pre-0008 snapshots keep resource_id = NULL and stay valid.
+    resource_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "tbl_scheme_source_resource.resource_id", ondelete="SET NULL"
+        ),
+        index=True,
+    )
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    final_url: Mapped[str | None] = mapped_column(String(1000))
+    content_type: Mapped[str | None] = mapped_column(String(200))
+    content_length: Mapped[int | None] = mapped_column(BigInteger)
+    error_detail: Mapped[str | None] = mapped_column(Text)
+
     source: Mapped[SchemeSource] = relationship(back_populates="documents")
+    resource: Mapped["SchemeSourceResource"] = relationship(
+        back_populates="snapshots"
+    )
     scheme: Mapped["SchemeMaster"] = relationship()
     contents: Mapped[list["SchemeSourceContent"]] = relationship(
         back_populates="document",
@@ -287,3 +329,131 @@ class SchemeIngestionRun(Base):
 
     def __repr__(self) -> str:
         return f"<SchemeIngestionRun {self.ingestion_run_id} {self.status}>"
+
+
+class SchemeSourceResource(Base):
+    """
+    Phase 3B (migration 0008): a stable, logical discoverable endpoint or
+    document belonging to a source.
+
+    A Resource is the identity of "the department scheme catalogue page",
+    "a specific GR PDF", "an application portal", etc. Snapshots
+    (tbl_scheme_source_document rows) reference it via nullable resource_id.
+
+    Identity: (source_id, resource_url) with URL normalization applied by
+    the application layer (see services.resource_service.normalize_resource_url)
+    per the frozen Task 1E design.
+    """
+
+    __tablename__ = "tbl_scheme_source_resource"
+    __table_args__ = (
+        CheckConstraint(
+            "resource_type IN ('CATALOGUE_PAGE','SCHEME_PAGE','PDF',"
+            "'APPLICATION_PORTAL','API_ENDPOINT','DOCUMENT_ARCHIVE','OTHER')",
+            name="ck_source_resource_type",
+        ),
+        CheckConstraint(
+            "status IN ('ACTIVE','INACTIVE','RETIRED')",
+            name="ck_source_resource_status",
+        ),
+        UniqueConstraint(
+            "source_id", "resource_url", name="uq_source_resource_url"
+        ),
+    )
+
+    resource_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_scheme_source.source_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    resource_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Normalized by the application layer before persistence (Task 1E rules).
+    resource_url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    # CATALOGUE_PAGE | SCHEME_PAGE | PDF | APPLICATION_PORTAL | API_ENDPOINT
+    # | DOCUMENT_ARCHIVE | OTHER
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    language: Mapped[str | None] = mapped_column(String(20), default="en")
+    # ACTIVE | INACTIVE | RETIRED
+    status: Mapped[str | None] = mapped_column(String(20), default="ACTIVE")
+    # e.g. HTTP_GET (future: PDF_GET, API_GET)
+    fetch_method: Mapped[str | None] = mapped_column(String(50), default="HTTP_GET")
+    is_application_portal: Mapped[bool | None] = mapped_column(
+        Boolean, server_default=false()
+    )
+    discovered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    source: Mapped[SchemeSource] = relationship(back_populates="resources")
+    snapshots: Mapped[list["SchemeSourceDocument"]] = relationship(
+        back_populates="resource"
+    )
+
+    def __repr__(self) -> str:
+        return f"<SchemeSourceResource {self.resource_name} ({self.resource_type})>"
+
+
+class SchemeIngestionItem(Base):
+    """
+    Phase 3B (migration 0008): per-resource attempt tracking within one
+    ingestion run. A run has zero or more items; each item optionally links
+    the attempted resource and the snapshot (document) it produced.
+    """
+
+    __tablename__ = "tbl_scheme_ingestion_item"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING','RUNNING','SUCCEEDED','FAILED','SKIPPED')",
+            name="ck_ingestion_item_status",
+        ),
+    )
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "tbl_scheme_ingestion_run.ingestion_run_id", ondelete="CASCADE"
+        ),
+        nullable=False,
+        index=True,
+    )
+    # SET NULL: run/snapshot history must survive resource or snapshot removal.
+    resource_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "tbl_scheme_source_resource.resource_id", ondelete="SET NULL"
+        ),
+    )
+    source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "tbl_scheme_source_document.source_document_id", ondelete="SET NULL"
+        ),
+    )
+    # PENDING | RUNNING | SUCCEEDED | FAILED | SKIPPED
+    status: Mapped[str | None] = mapped_column(String(20), default="PENDING")
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False, server_default=func.now()
+    )
+
+    run: Mapped[SchemeIngestionRun] = relationship()
+    resource: Mapped[SchemeSourceResource] = relationship()
+
+    def __repr__(self) -> str:
+        return f"<SchemeIngestionItem {self.item_id} {self.status}>"

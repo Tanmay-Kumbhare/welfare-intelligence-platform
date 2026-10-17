@@ -1,7 +1,8 @@
 # PROJECT_STATE.md — Welfare Intelligence Platform (VidyaSetu)
 
-**Status:** V2 and eligibility-insight features merged. Phase 3B not started.
-**Last updated:** 2026-10-14.
+**Status:** V2 and eligibility-insight features merged. Phase 3B source/resource
+admin foundation is in progress; operational ingestion is not complete.
+**Last updated:** 2026-10-16.
 
 This is the **authoritative implementation-state document**. Every future coding
 agent must read it (see `AGENTS.md`) before changing anything. It deliberately
@@ -235,12 +236,18 @@ findings: raw source content must be preserved verbatim; scheme master must
 hold only canonical curated fields; rule provenance must link every rule to
 its evidence; the engine must stay deterministic.
 
-## 12. PLANNED — Phase 3B–3F
+## 12. Phase 3B–3F — foundation and remaining work
 
 `PHASE_3B_TO_3F_IMPLEMENTATION_SPEC.md` is the approved blueprint. Summary:
 
 - **3B — ingestion:** source registry, scheduled/manual fetch, raw snapshots,
   content extraction plumbing. No rule changes without review.
+- **3B foundation now implemented:** migration `0011_source_resource_foundation`
+  adds source-resource identities, per-resource ingestion-item tracking, and
+  nullable fetch-evidence fields. Admin APIs and screens now support curated
+  scheme/rule/document management, scheme-to-source-document links, and
+  provenance review. This is curation and schema groundwork, not a complete
+  live-ingestion pipeline; focused backend validation is still pending.
 - **3C — candidate extraction + validation:** extracted candidate rules and
   evidence, human validation workflow.
 - **3D — immutable published versions:** publish workflow, versioned scheme
@@ -254,20 +261,19 @@ its evidence; the engine must stay deterministic.
   stored eligibility outcomes; simulation is in-memory, and ranking remains a
   presentation layer. This is not completion of all planned Phase 3 work.
 
-**Explicitly NOT IMPLEMENTED anywhere:** live government scheme ingestion,
-automatic crawling, candidate extraction, review/publish workflow, immutable
-published scheme versions, the published-rule DSL, tri-state eligibility
-evaluation (ELIGIBLE / NOT_ELIGIBLE / POTENTIALLY_ELIGIBLE status columns
-exist but the engine still emits boolean results), and live-source-backed
-recommendations.
+**Explicitly NOT IMPLEMENTED anywhere:** operational live government scheme
+ingestion, scheduled crawling, candidate extraction, a review/publish workflow,
+immutable published scheme versions, the published-rule DSL, tri-state
+eligibility evaluation (ELIGIBLE / NOT_ELIGIBLE / POTENTIALLY_ELIGIBLE status
+columns exist but the engine still emits boolean results), and live-source-
+backed recommendations.
 
 ## 13. Next step after this checkpoint
 
-1. Complete the database-backed backend regression run for identity, forms,
-   and normalization; the post-merge run was not verified.
-2. Then begin **Phase 3B only** per
-   `PHASE_3B_TO_3F_IMPLEMENTATION_SPEC.md` §4 (source snapshots and ingestion
-   tables/logic), following `AGENTS.md`.
+1. Complete the database-backed backend regression run for the new admin and
+   source-resource foundation; the focused run is in progress.
+2. Continue **Phase 3B only** per `PHASE_3B_TO_3F_IMPLEMENTATION_SPEC.md` §4,
+   validating source snapshots and ingestion behavior before moving on.
 
 ## 14. API surface (current)
 
@@ -284,12 +290,14 @@ recommendations.
 - `/api/v1/schemes/` — scheme catalogue and documents
 - `/api/v1/recommendations/{citizen_id}` — ranked recommendations with
   explanations, gap analysis, and alternative scheme suggestions
+- `/api/v1/admin/*` — protected admin dashboard, scheme/rule/document
+  management, source-resource CRUD, provenance links, and review controls
 
 ## 15. Migrations
 
-Chain (never rewritten or squashed): `0001` (V1 core) → `0002` (V1 indexes /
-refinements) → `0003` (additive Phase 1/V2 foundation) →
-`0004_auth_user_and_ownership` (user account, roles, sessions, citizen link) →
-`0005_oauth_providers_and_account_linking` (nullable password_hash, google_id,
-digilocker_id, full_name). Future schema changes require new additive Alembic
-migrations with working upgrade *and* downgrade.
+Chain: `0001` (V1 core) → `0002` (V1 indexes/refinements) → `0003` (Phase 1/V2
+foundation) → `0004_auth_user_and_ownership` → `0005` (citizen profile types) →
+`0006_domain_documents` → `0007_oauth_and_linking` → `0008_education_records`
+→ `0009_location_address_fields` → `0010_citizen_timestamps` →
+`0011_source_resource_foundation`. Future schema changes require new additive
+Alembic migrations with working `upgrade()` and `downgrade()` functions.

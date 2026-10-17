@@ -70,6 +70,7 @@ class TokenResponse(BaseModel):
     token: str
     user_id: uuid.UUID
     email: str
+    roles: list[str]
 
 
 class MeResponse(BaseModel):
@@ -125,11 +126,12 @@ async def register(
     except UserAlreadyExistsError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
-    user, token = await service.login(body.email, body.password)
+    user, token, roles = await service.login(body.email, body.password)
     return TokenResponse(
         token=token,
         user_id=user.user_id,
         email=user.email,
+        roles=roles,
     )
 
 
@@ -140,7 +142,7 @@ async def login(
 ) -> Any:
     service = AuthService(db)
     try:
-        user, token = await service.login(body.email, body.password)
+        user, token, roles = await service.login(body.email, body.password)
     except InvalidCredentialsError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
@@ -148,6 +150,7 @@ async def login(
         token=token,
         user_id=user.user_id,
         email=user.email,
+        roles=roles,
     )
 
 
@@ -206,10 +209,12 @@ async def google_callback(
     except AuthServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
+    roles = await service.get_roles_for_user(user)
     return TokenResponse(
         token=token,
         user_id=user.user_id,
         email=user.email,
+        roles=roles,
     )
 
 
@@ -281,10 +286,12 @@ async def digilocker_callback(
     except AuthServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
+    roles = await service.get_roles_for_user(user)
     return TokenResponse(
         token=token,
         user_id=user.user_id,
         email=user.email,
+        roles=roles,
     )
 
 

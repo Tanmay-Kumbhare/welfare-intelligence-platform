@@ -10,7 +10,11 @@ const STORAGE_KEY = "vidyasetu.citizen_id";
 
 export function getStoredCitizenId() {
   try {
-    return window.localStorage.getItem(STORAGE_KEY);
+    const val = window.localStorage.getItem(STORAGE_KEY);
+    if (!val || val === "null" || val === "undefined") {
+      return null;
+    }
+    return val;
   } catch {
     return null;
   }
@@ -18,6 +22,10 @@ export function getStoredCitizenId() {
 
 export function setStoredCitizenId(citizenId) {
   try {
+    if (!citizenId || citizenId === "null" || citizenId === "undefined") {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
     window.localStorage.setItem(STORAGE_KEY, citizenId);
   } catch {
     // Ignore storage failures (e.g. private browsing) — the app still

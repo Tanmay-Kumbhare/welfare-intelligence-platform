@@ -59,6 +59,15 @@ function formatTimestamp(ts) {
   }
 }
 
+function answersPayload(answersMap) {
+  return [...answersMap.entries()]
+    // Filter out null, undefined, and empty strings — the backend enum
+    // validators reject "" just as they reject missing values. This stops
+    // profile-prefilled but unanswered enum questions from causing 422s.
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([question_id, value]) => ({ question_id, value, source: "USER_INPUT" }));
+}
+
 function SchemeMeta({ scheme }) {
   if (!scheme) return null;
   return (
@@ -193,7 +202,7 @@ export default function CheckEligibilityPage() {
         if (me?.data) {
           isAuthenticated = true;
           const cid = me.data.citizen_id;
-          if (cid) {
+          if (cid && cid !== "null" && cid !== "undefined") {
             const res = await citizenService.get(cid);
             resolvedCitizen = res.data;
           }
@@ -270,7 +279,12 @@ export default function CheckEligibilityPage() {
 
   // 4. Form Evaluation & Submission Helpers for questionnaire mode
   const ensureSubmission = useCallback(async () => {
-    if (submissionInFlight.current || !citizen?.citizen_id) return null;
+    if (
+      submissionInFlight.current ||
+      !citizen?.citizen_id ||
+      citizen.citizen_id === "null" ||
+      citizen.citizen_id === "undefined"
+    ) return null;
     submissionInFlight.current = true;
     try {
       const response = await formSubmissionService.create(FORM_CODE, {
@@ -333,12 +347,22 @@ export default function CheckEligibilityPage() {
   );
 
   const submitFormAndEvaluate = useCallback(async () => {
-    if (!citizen?.citizen_id || !submission?.submission_id) return;
+    const citizenId = citizen?.citizen_id;
+    if (
+      !citizenId ||
+      citizenId === "null" ||
+      citizenId === "undefined" ||
+      !submission?.submission_id
+    ) return;
     setEvaluating(true);
     try {
+      const nowApplicable = computeApplicableMap(form.sections, answersRef.current);
+      const payload = answersPayload(answersRef.current).filter((answer) =>
+        nowApplicable.get(answer.question_id) !== false
+      );
       await formSubmissionService.update(submission.submission_id, {
-        citizen_id: citizen.citizen_id,
-        answers: [...answers.entries()].map(([qid, val]) => ({ question_id: qid, value: val, source: "USER_INPUT" })),
+        citizen_id: citizenId,
+        answers: payload,
       });
       await formSubmissionService.complete(submission.submission_id, { citizen_id: citizen.citizen_id });
       await formSubmissionService.normalize(submission.submission_id, { citizen_id: citizen.citizen_id });

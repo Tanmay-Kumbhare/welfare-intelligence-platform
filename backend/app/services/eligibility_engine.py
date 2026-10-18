@@ -92,7 +92,13 @@ class EligibilityEngine:
                 rule_w = get_rule_weight(rule)
                 total_weight += rule_w
 
-                actual_value = self._resolve_parameter(citizen, rule.parameter_name, facts_dict=facts_dict)
+                if facts_dict is not None:
+                    try:
+                        actual_value = self._resolve_parameter(citizen, rule.parameter_name, facts_dict=facts_dict)
+                    except TypeError:
+                        actual_value = self._resolve_parameter(citizen, rule.parameter_name)
+                else:
+                    actual_value = self._resolve_parameter(citizen, rule.parameter_name)
                 is_missing = actual_value is None
                 passed = self._apply_operator(actual_value, rule.operator, rule.required_value)
                 desc = rule.rule_description or rule.parameter_name
@@ -127,9 +133,9 @@ class EligibilityEngine:
                 })
 
             if group.intra_group_operator.upper() == "AND":
-                group_passed = all(r["passed"] for r in rule_results) if rule_results else True
+                group_passed = all(r["passed"] for r in rule_results) if rule_results else False
             else:  # OR
-                group_passed = any(r["passed"] for r in rule_results) if rule_results else True
+                group_passed = any(r["passed"] for r in rule_results) if rule_results else False
 
             if not group_passed:
                 for r in rule_results:
@@ -144,9 +150,9 @@ class EligibilityEngine:
             })
 
         if scheme.group_combining_operator.upper() == "AND":
-            overall_result = all(g["group_passed"] for g in group_results) if group_results else True
+            overall_result = all(g["group_passed"] for g in group_results) if (group_results and total_rules > 0) else False
         else:  # OR
-            overall_result = any(g["group_passed"] for g in group_results) if group_results else True
+            overall_result = any(g["group_passed"] for g in group_results) if (group_results and total_rules > 0) else False
 
         # Rule Match Score calculation:
         # Range: 0.0 to 100.0 rounded to 1 decimal place.
@@ -177,7 +183,6 @@ class EligibilityEngine:
             "failed_mandatory_rules": failed_mandatory_rules,
             "group_combining_operator": scheme.group_combining_operator,
             "rule_match_score": rule_match_score,
-            "total_rules": total_rules,
             "passed_rules_count": passed_rules_count,
             "failed_rules_count": failed_rules_count,
             "missing_rules_count": missing_rules_count,
@@ -187,7 +192,10 @@ class EligibilityEngine:
         if overall_result:
             reason = f"Citizen meets all criteria for {scheme.scheme_name}."
         else:
-            reason = f"Does not meet criteria: {', '.join(failed_rules)}"
+            if failed_rules:
+                reason = f"Does not meet criteria: {', '.join(failed_rules)}"
+            else:
+                reason = f"No valid eligibility criteria defined for {scheme.scheme_name}."
 
         return overall_result, evaluation_details, reason
 
@@ -201,6 +209,19 @@ class EligibilityEngine:
         for fact in (getattr(citizen, "profile_facts", None) or []):
             if fact.fact_code == fact_code and fact.effective_until is None:
                 return fact.fact_value
+        return None
+
+    @staticmethod
+    def _parse_bool_value(val: Any) -> bool | None:
+        """Parse truthy and falsy values robustly; return None if missing or invalid."""
+        if isinstance(val, bool):
+            return val
+        if val is not None:
+            s = str(val).strip().upper()
+            if s in ("TRUE", "1", "YES"):
+                return True
+            if s in ("FALSE", "0", "NO"):
+                return False
         return None
 
     def _resolve_parameter(
@@ -235,9 +256,11 @@ class EligibilityEngine:
                 except (TypeError, ValueError):
                     pass
             if citizen.financial_profile and citizen.financial_profile.annual_income is not None:
-                return float(citizen.financial_profile.annual_income)
+                try:
+                    return float(citizen.financial_profile.annual_income)
+                except (TypeError, ValueError):
+                    pass
             return None
-
         elif parameter_name == "poverty_category":
             pov_val = self._fact_value(citizen, "POVERTY_CATEGORY", facts_dict=facts_dict)
             if pov_val is not None:
@@ -252,25 +275,33 @@ class EligibilityEngine:
                 except (TypeError, ValueError):
                     pass
             if citizen.financial_profile and citizen.financial_profile.land_holding_size is not None:
-                return float(citizen.financial_profile.land_holding_size)
+                try:
+                    return float(citizen.financial_profile.land_holding_size)
+                except (TypeError, ValueError):
+                    pass
             return None
 
         elif parameter_name == "is_bpl_card_holder":
             bpl_val = self._fact_value(citizen, "IS_BPL_CARD_HOLDER", facts_dict=facts_dict)
-            if bpl_val is not None:
-                return bpl_val in ("True", "true", "1", "YES", True)
+            parsed_bool = self._parse_bool_value(bpl_val)
+            if parsed_bool is not None:
+                return parsed_bool
             if citizen.financial_profile and citizen.financial_profile.is_bpl_card_holder is not None:
-                return citizen.financial_profile.is_bpl_card_holder
+                profile_bool = self._parse_bool_value(citizen.financial_profile.is_bpl_card_holder)
+                if profile_bool is not None:
+                    return profile_bool
             return None
 
         elif parameter_name == "is_income_tax_payer":
             tax_val = self._fact_value(citizen, "IS_INCOME_TAX_PAYER", facts_dict=facts_dict)
-            if tax_val is not None:
-                return tax_val in ("True", "true", "1", "YES", True)
+            parsed_bool = self._parse_bool_value(tax_val)
+            if parsed_bool is not None:
+                return parsed_bool
             if citizen.financial_profile and citizen.financial_profile.is_income_tax_payer is not None:
-                return citizen.financial_profile.is_income_tax_payer
+                profile_bool = self._parse_bool_value(citizen.financial_profile.is_income_tax_payer)
+                if profile_bool is not None:
+                    return profile_bool
             return None
-
         elif parameter_name == "employment_status":
             fact_value = self._fact_value(citizen, "EMPLOYMENT_STATUS", facts_dict=facts_dict)
             if fact_value is not None:

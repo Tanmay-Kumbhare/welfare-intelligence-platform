@@ -161,7 +161,7 @@ def test_missing_rule_values_not_counted_as_passed():
 
 
 def test_no_evaluable_rules():
-    """Schemes with 0 rules produce 0.0% score without division-by-zero or false 100%."""
+    """Schemes with 0 rules produce 0.0% score and are never marked confirmed eligible."""
     engine = EligibilityEngine()
 
     citizen = CitizenMaster(
@@ -177,13 +177,229 @@ def test_no_evaluable_rules():
 
     result, details, reason = engine.evaluate_scheme(citizen, scheme)
 
-    # Empty rule groups vacuously satisfy overall_result per existing engine logic
-    assert result is True
+    # Empty rule groups must never evaluate to confirmed eligible
+    assert result is False
+    assert details["overall_result"] is False
     assert details["rule_match_score"] == 0.0
     assert details["total_rules"] == 0
     assert details["passed_rules_count"] == 0
     assert details["failed_rules_count"] == 0
     assert details["missing_rules_count"] == 0
+    assert "No valid eligibility criteria defined" in reason
+
+
+def test_empty_rule_group_never_confirmed_eligible():
+    """A scheme containing rule groups with no rules must not evaluate to True."""
+    engine = EligibilityEngine()
+
+    citizen = CitizenMaster(
+        citizen_type="GENERAL",
+        date_of_birth=date(1995, 1, 1),
+    )
+
+    scheme = SchemeMaster(
+        scheme_name="Empty Group Scheme",
+        group_combining_operator="AND",
+    )
+    group = SchemeRuleGroup(group_name="Empty Group", intra_group_operator="AND")
+    group.rules = []
+    scheme.rule_groups = [group]
+
+    result, details, reason = engine.evaluate_scheme(citizen, scheme)
+
+    assert result is False
+    assert details["overall_result"] is False
+    assert details["groups"][0]["group_passed"] is False
+    assert details["rule_match_score"] == 0.0
+    assert details["total_rules"] == 0
+
+
+def test_missing_annual_income_fails_ceiling_rule():
+    """Missing annual income resolves to None, fails <= ceiling rule, and records as missing."""
+    engine = EligibilityEngine()
+
+    citizen = CitizenMaster(
+        citizen_type="STUDENT",
+        date_of_birth=date(2002, 1, 1),
+    )
+    citizen.financial_profile = FinancialProfile(annual_income=None)
+
+    scheme = SchemeMaster(
+        scheme_name="Scholarship With Income Cap",
+        group_combining_operator="AND",
+    )
+    group = SchemeRuleGroup(group_name="Income Criteria", intra_group_operator="AND")
+    group.rules = [
+        SchemeEligibilityRule(parameter_name="annual_income", operator="<=", required_value="250000"),
+    ]
+    scheme.rule_groups = [group]
+
+    result, details, reason = engine.evaluate_scheme(citizen, scheme)
+
+    assert result is False
+    assert details["overall_result"] is False
+    assert details["missing_rules_count"] == 1
+    assert details["passed_rules_count"] == 0
+    assert details["rule_match_score"] == 0.0
+    rule_evidence = details["groups"][0]["rules"][0]
+    assert rule_evidence["actual"] is None
+    assert rule_evidence["is_missing"] is True
+    assert rule_evidence["passed"] is False
+
+
+def test_valid_zero_income_passes_ceiling_rule():
+    """Valid zero income (0.0) is preserved as non-missing and satisfies <= ceiling rule."""
+    engine = EligibilityEngine()
+
+    citizen = CitizenMaster(
+        citizen_type="STUDENT",
+        date_of_birth=date(2002, 1, 1),
+    )
+    citizen.financial_profile = FinancialProfile(annual_income=0.0)
+
+    scheme = SchemeMaster(
+        scheme_name="Scholarship With Income Cap",
+        group_combining_operator="AND",
+    )
+    group = SchemeRuleGroup(group_name="Income Criteria", intra_group_operator="AND")
+    group.rules = [
+        SchemeEligibilityRule(parameter_name="annual_income", operator="<=", required_value="250000"),
+    ]
+    scheme.rule_groups = [group]
+
+    result, details, reason = engine.evaluate_scheme(citizen, scheme)
+
+    assert result is True
+    assert details["overall_result"] is True
+    assert details["passed_rules_count"] == 1
+    assert details["missing_rules_count"] == 0
+    assert details["rule_match_score"] == 100.0
+    rule_evidence = details["groups"][0]["rules"][0]
+    assert rule_evidence["actual"] == 0.0
+    assert rule_evidence["is_missing"] is False
+    assert rule_evidence["passed"] is True
+
+
+def test_missing_land_holding_fails_ceiling_rule():
+    """Missing land holding size resolves to None, fails <= rule, and is marked missing."""
+    engine = EligibilityEngine()
+
+    citizen = CitizenMaster(
+        citizen_type="FARMER",
+        date_of_birth=date(1980, 1, 1),
+    )
+    citizen.financial_profile = FinancialProfile(land_holding_size=None)
+
+    scheme = SchemeMaster(
+        scheme_name="Farmer Land Scheme",
+        group_combining_operator="AND",
+    )
+    group = SchemeRuleGroup(group_name="Land", intra_group_operator="AND")
+    group.rules = [
+        SchemeEligibilityRule(parameter_name="land_holding_size", operator="<=", required_value="2.0"),
+    ]
+    scheme.rule_groups = [group]
+
+    result, details, reason = engine.evaluate_scheme(citizen, scheme)
+
+    assert result is False
+    assert details["overall_result"] is False
+    assert details["missing_rules_count"] == 1
+    rule_evidence = details["groups"][0]["rules"][0]
+    assert rule_evidence["actual"] is None
+    assert rule_evidence["is_missing"] is True
+    assert rule_evidence["passed"] is False
+
+
+def test_valid_zero_land_holding_passes_ceiling_rule():
+    """Valid zero land holding (0.0) is preserved as non-missing and passes <= ceiling."""
+    engine = EligibilityEngine()
+
+    citizen = CitizenMaster(
+        citizen_type="FARMER",
+        date_of_birth=date(1980, 1, 1),
+    )
+    citizen.financial_profile = FinancialProfile(land_holding_size=0.0)
+
+    scheme = SchemeMaster(
+        scheme_name="Farmer Land Scheme",
+        group_combining_operator="AND",
+    )
+    group = SchemeRuleGroup(group_name="Land", intra_group_operator="AND")
+    group.rules = [
+        SchemeEligibilityRule(parameter_name="land_holding_size", operator="<=", required_value="2.0"),
+    ]
+    scheme.rule_groups = [group]
+
+    result, details, reason = engine.evaluate_scheme(citizen, scheme)
+
+    assert result is True
+    assert details["overall_result"] is True
+    rule_evidence = details["groups"][0]["rules"][0]
+    assert rule_evidence["actual"] == 0.0
+    assert rule_evidence["is_missing"] is False
+    assert rule_evidence["passed"] is True
+
+
+def test_unknown_tax_payer_status_fails_exclusion_check():
+    """Unknown tax-payer status (financial_profile None or is_income_tax_payer None) fails rule."""
+    engine = EligibilityEngine()
+
+    citizen = CitizenMaster(
+        citizen_type="FARMER",
+        date_of_birth=date(1980, 1, 1),
+    )
+    citizen.financial_profile = None
+
+    scheme = SchemeMaster(
+        scheme_name="PM-KISAN Exclusion",
+        group_combining_operator="AND",
+    )
+    group = SchemeRuleGroup(group_name="Tax Exclusion", intra_group_operator="AND")
+    group.rules = [
+        SchemeEligibilityRule(parameter_name="is_income_tax_payer", operator="==", required_value="false"),
+    ]
+    scheme.rule_groups = [group]
+
+    result, details, reason = engine.evaluate_scheme(citizen, scheme)
+
+    assert result is False
+    assert details["overall_result"] is False
+    assert details["missing_rules_count"] == 1
+    rule_evidence = details["groups"][0]["rules"][0]
+    assert rule_evidence["actual"] is None
+    assert rule_evidence["is_missing"] is True
+    assert rule_evidence["passed"] is False
+
+
+def test_explicit_false_tax_payer_status_passes_exclusion_check():
+    """Explicitly recorded False is_income_tax_payer passes the '== false' exclusion check."""
+    engine = EligibilityEngine()
+
+    citizen = CitizenMaster(
+        citizen_type="FARMER",
+        date_of_birth=date(1980, 1, 1),
+    )
+    citizen.financial_profile = FinancialProfile(is_income_tax_payer=False)
+
+    scheme = SchemeMaster(
+        scheme_name="PM-KISAN Exclusion",
+        group_combining_operator="AND",
+    )
+    group = SchemeRuleGroup(group_name="Tax Exclusion", intra_group_operator="AND")
+    group.rules = [
+        SchemeEligibilityRule(parameter_name="is_income_tax_payer", operator="==", required_value="false"),
+    ]
+    scheme.rule_groups = [group]
+
+    result, details, reason = engine.evaluate_scheme(citizen, scheme)
+
+    assert result is True
+    assert details["overall_result"] is True
+    rule_evidence = details["groups"][0]["rules"][0]
+    assert rule_evidence["actual"] is False
+    assert rule_evidence["is_missing"] is False
+    assert rule_evidence["passed"] is True
 
 
 def test_and_or_rule_groups_score_and_eligibility():

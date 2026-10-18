@@ -29,6 +29,7 @@ PARAMETER_LABELS: Dict[str, str] = {
     "employment_status": "Employment status",
     "social_category": "Social / Caste category",
     "education_level": "Education level",
+    "currently_studying": "Current student enrollment status",
     "disability_status": "Disability status",
     "area_type": "Area type (Rural/Urban)",
     "state": "State of residence",

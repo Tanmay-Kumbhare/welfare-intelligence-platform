@@ -17,6 +17,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "social_category",
               "operator": "==",
               "required_value": "OBC",
@@ -87,6 +96,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "social_category",
               "operator": "==",
               "required_value": "OBC",
@@ -148,6 +166,15 @@
           "intra_group_operator": "AND",
           "group_priority": 1,
           "rules": [
+            {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
             {
               "parameter_name": "social_category",
               "operator": "==",
@@ -218,6 +245,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "social_category",
               "operator": "==",
               "required_value": "SC",
@@ -278,6 +314,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "social_category",
               "operator": "==",
               "required_value": "ST",
@@ -337,6 +382,15 @@
           "intra_group_operator": "AND",
           "group_priority": 1,
           "rules": [
+            {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
             {
               "parameter_name": "social_category",
               "operator": "==",
@@ -407,6 +461,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "social_category",
               "operator": "==",
               "required_value": "VJNT",
@@ -475,6 +538,15 @@
           "intra_group_operator": "AND",
           "group_priority": 1,
           "rules": [
+            {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
             {
               "parameter_name": "social_category",
               "operator": "==",
@@ -545,6 +617,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "social_category",
               "operator": "IN",
               "required_value": "MINORITY,MUSLIM,CHRISTIAN,SIKH,BUDDHIST,PARSI,JAIN",
@@ -614,6 +695,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "twelfth_percentile",
               "operator": ">=",
               "required_value": "80",
@@ -673,6 +763,15 @@
           "intra_group_operator": "AND",
           "group_priority": 1,
           "rules": [
+            {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
             {
               "parameter_name": "gender",
               "operator": "==",
@@ -734,6 +833,15 @@
           "group_priority": 1,
           "rules": [
             {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
+            {
               "parameter_name": "disability_status",
               "operator": "!=",
               "required_value": "NONE",
@@ -777,6 +885,15 @@
           "intra_group_operator": "AND",
           "group_priority": 1,
           "rules": [
+            {
+              "parameter_name": "currently_studying",
+              "operator": "==",
+              "required_value": "true",
+              "rule_description": "Must be currently enrolled and studying in an eligible course",
+              "rule_priority": 1,
+              "failure_stage_code": "S0_ELIGIBILITY",
+              "remedy_template": "This scholarship is for active students only. You must be currently enrolled in an approved course/institution."
+            },
             {
               "parameter_name": "disability_status",
               "operator": "!=",

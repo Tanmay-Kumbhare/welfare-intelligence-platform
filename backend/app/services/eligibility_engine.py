@@ -27,6 +27,8 @@ DEFAULT_PARAMETER_WEIGHTS: dict[str, int] = {
     "caste_category": 25,
     # Education (20)
     "education_level": 20,
+    "currently_studying": 20,
+    "is_enrolled": 20,
     "academic_percentage": 20,
     "marksheet_percentage": 20,
     "academic_cgpa": 20,
@@ -319,6 +321,10 @@ class EligibilityEngine:
             if fact_value is not None:
                 return fact_value
             return citizen.demographic_profile.education_level if citizen.demographic_profile else None
+
+        elif parameter_name in ("currently_studying", "is_studying", "is_enrolled", "is_currently_enrolled"):
+            fact_val = self._fact_value(citizen, "CURRENTLY_STUDYING", facts_dict=facts_dict)
+            return self._parse_bool_value(fact_val)
 
         elif parameter_name == "disability_status":
             fact_value = self._fact_value(citizen, "DISABILITY_STATUS", facts_dict=facts_dict)

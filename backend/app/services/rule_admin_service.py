@@ -67,12 +67,24 @@ ELIGIBILITY_RULE_PARAMETERS = (
     "employment_status",
     "social_category",
     "education_level",
+    "currently_studying",
+    "is_studying",
+    "is_enrolled",
+    "is_currently_enrolled",
     "disability_status",
     "area_type",
     "state",
     "tenth_percentage",
     "twelfth_percentage",
     "twelfth_percentile",
+    "graduation_percentage",
+    "graduation_cgpa",
+    "current_education_level",
+    "current_degree",
+    "current_branch",
+    "current_year",
+    "current_semester",
+    "highest_education_level",
     "livestock_cattle_count",
     "livestock_poultry_count",
 )
@@ -103,10 +115,19 @@ NumericRuleParameters = (
     "tenth_percentage",
     "twelfth_percentage",
     "twelfth_percentile",
+    "graduation_percentage",
+    "graduation_cgpa",
     "livestock_cattle_count",
     "livestock_poultry_count",
 )
-BooleanRuleParameters = ("is_bpl_card_holder", "is_income_tax_payer")
+BooleanRuleParameters = (
+    "is_bpl_card_holder",
+    "is_income_tax_payer",
+    "currently_studying",
+    "is_studying",
+    "is_enrolled",
+    "is_currently_enrolled",
+)
 
 _BOOLEAN_TRUE = ("true", "1", "yes")
 _BOOLEAN_FALSE = ("false", "0", "no")
@@ -421,6 +442,7 @@ class RuleAdminService:
         rule = SchemeEligibilityRule(
             scheme_id=scheme_id,
             group_id=group.group_id,
+            group=group,
             parameter_name=parameter_name.strip(),
             operator=(operator or "").strip(),
             required_value=validated_value,

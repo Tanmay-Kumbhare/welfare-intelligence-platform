@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import (
     get_authenticated_user,
-    get_optional_user,
     require_same_citizen,
 )
 from app.database import get_db
@@ -91,7 +90,7 @@ async def simulate_citizen_eligibility(
     citizen_id: uuid.UUID,
     payload: SimulationInput,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     """
     Simulates what-if profile changes for a citizen against all active schemes.

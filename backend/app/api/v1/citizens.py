@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_optional
-from app.api.v1.deps import get_optional_user, require_same_citizen
+from app.api.v1.deps import get_authenticated_user, require_same_citizen
 from app.database import get_db
 from app.models.auth import UserAccount
 from app.schemas.citizen import (
@@ -41,14 +41,14 @@ async def register_citizen(
 async def get_citizen(
     citizen_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
+    # Authenticated callers may only read their own profile (admins excepted).
+    await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)
     citizen = await service.get_citizen(citizen_id)
     if not citizen:
         raise HTTPException(status_code=404, detail="Citizen not found")
-    # Authenticated callers may only read their own profile (admins excepted).
-    await require_same_citizen(user, citizen_id, db)
     return citizen
 
 
@@ -57,7 +57,7 @@ async def update_citizen(
     citizen_id: uuid.UUID,
     data: CitizenUpdate,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     # Ownership first: an authenticated user must not edit another citizen.
     await require_same_citizen(user, citizen_id, db)
@@ -76,7 +76,7 @@ async def update_citizen(
 async def list_education_records(
     citizen_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Sequence[EducationRecordResponse]:
     await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)
@@ -92,7 +92,7 @@ async def add_education_record(
     citizen_id: uuid.UUID,
     data: EducationRecordCreate,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> EducationRecordResponse:
     await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)
@@ -108,7 +108,7 @@ async def update_education_record(
     record_id: uuid.UUID,
     data: EducationRecordUpdate,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> EducationRecordResponse:
     await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)
@@ -126,7 +126,7 @@ async def delete_education_record(
     citizen_id: uuid.UUID,
     record_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     await require_same_citizen(user, citizen_id, db)
     service = CitizenService(db)
@@ -144,7 +144,7 @@ def _citizen_response_dict(citizen) -> dict:
 async def audit_citizen_profile(
     citizen_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     """
     Audits a citizen profile for conflicting facts, stale records,

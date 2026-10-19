@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
+from app.models.auth import UserAccount, UserRole
 from app.models.citizen import CitizenMaster
 from app.models.scheme import SchemeMaster, SchemeRuleGroup, SchemeEligibilityRule
 from app.models.assessment import EligibilityAssessment
@@ -282,11 +283,14 @@ async def test_stale_assessment_detected_after_rule_mutation(db: AsyncSession):
 
     assert scheme.last_updated_at > eval_time
 
+    admin_user = UserAccount(user_id=uuid.uuid4(), email="admin@test.gov.in")
+    admin_user.roles = [UserRole(role="ADMIN")]
+
     # 1. Exercise the actual recommendations API response
     api_response = await get_citizen_recommendations(
         citizen_id=citizen.citizen_id,
         db=db,
-        user=None,
+        user=admin_user,
     )
     assert api_response.eligible_count == 1
     stale_item = api_response.eligible_schemes[0]
@@ -322,7 +326,7 @@ async def test_stale_assessment_detected_after_rule_mutation(db: AsyncSession):
     fresh_api_response = await get_citizen_recommendations(
         citizen_id=citizen.citizen_id,
         db=db,
-        user=None,
+        user=admin_user,
     )
     assert fresh_api_response.ineligible_count == 1
     fresh_item = fresh_api_response.ineligible_schemes[0]
@@ -344,7 +348,9 @@ async def test_recommendations_api_http_staleness_lifecycle(db: AsyncSession):
         yield db
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_authenticated_user] = lambda: None
+    admin_user = UserAccount(user_id=uuid.uuid4(), email="admin@test.gov.in")
+    admin_user.roles = [UserRole(role="ADMIN")]
+    app.dependency_overrides[get_authenticated_user] = lambda: admin_user
     try:
         repo = AssessmentRepository(db)
         rule_service = RuleAdminService(db)

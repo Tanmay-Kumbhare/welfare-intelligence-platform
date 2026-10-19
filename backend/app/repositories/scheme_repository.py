@@ -79,7 +79,8 @@ class SchemeRepository:
             .options(
                 joinedload(SchemeMaster.rule_groups).joinedload(
                     SchemeMaster.rule_groups.property.mapper.class_.rules
-                )
+                ),
+                selectinload(SchemeMaster.documents),
             )
         )
         return result.unique().scalars().all()

@@ -4,8 +4,9 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_optional_user, require_same_citizen
+from app.api.v1.deps import get_authenticated_user, require_same_citizen
 from app.database import get_db
+from app.models.auth import UserAccount
 from app.repositories.citizen_repository import CitizenRepository
 from app.services.document_service import DocumentService
 
@@ -21,7 +22,7 @@ class DocumentUploadRequest(BaseModel):
 async def get_document_requirements(
     citizen_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     """Returns domain-level document requirements and current upload status."""
     await require_same_citizen(user, citizen_id, db)
@@ -40,7 +41,7 @@ async def upload_document(
     citizen_id: uuid.UUID,
     payload: DocumentUploadRequest,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     """Uploads a document (base64 encoded), classifies it, and returns status."""
     await require_same_citizen(user, citizen_id, db)
@@ -75,7 +76,7 @@ async def delete_document(
     citizen_id: uuid.UUID,
     document_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: Any = Depends(get_optional_user),
+    user: UserAccount = Depends(get_authenticated_user),
 ) -> Any:
     """Deletes an uploaded document."""
     await require_same_citizen(user, citizen_id, db)

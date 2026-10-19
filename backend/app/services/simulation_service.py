@@ -159,8 +159,8 @@ class SimulationService:
                 for d in scheme.documents:
                     scheme_docs.append({
                         "document_type": d.document_type,
-                        "name": d.document_name,
-                        "required": d.is_mandatory,
+                        "name": getattr(d, "document_name", getattr(d, "description", None)) or d.document_type,
+                        "required": getattr(d, "mandatory_flag", getattr(d, "is_mandatory", True)),
                         "status": "VALID",  # In what-if profile simulation, highlight rule gaps
                     })
 

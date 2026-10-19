@@ -70,7 +70,7 @@ async def get_submission(
     user: Any = Depends(get_optional_user),
 ) -> Any:
     # Authenticated callers may only read their own submissions.
-    await require_same_citizen(user, citizen_id, db)
+    await require_same_citizen(user, citizen_id, db, allow_anonymous=True)
     service = SubmissionService(db)
     try:
         return await service.get_submission(submission_id, citizen_id)
@@ -223,7 +223,7 @@ async def create_submission(
 ) -> Any:
     """Creates a DRAFT submission; re-calling resumes the existing draft."""
     # Authenticated callers may only create for themselves.
-    await require_same_citizen(user, data.citizen_id, db)
+    await require_same_citizen(user, data.citizen_id, db, allow_anonymous=True)
     service = SubmissionService(db)
     try:
         return await service.create_submission(form_code, data)
@@ -250,7 +250,7 @@ async def update_submission(
 ) -> Any:
     """Saves partial answers; required validation is deferred to completion."""
     # The body citizen_id is the owner claim — verified when authenticated.
-    await require_same_citizen(user, data.citizen_id, db)
+    await require_same_citizen(user, data.citizen_id, db, allow_anonymous=True)
     service = SubmissionService(db)
     try:
         return await service.update_submission(submission_id, data)
@@ -279,7 +279,7 @@ async def normalize_submission(
     canonical domain-profile columns, upserts open profile facts, records
     provenance, and reports unmapped answers. Idempotent — safe to re-run.
     """
-    await require_same_citizen(user, data.citizen_id, db)
+    await require_same_citizen(user, data.citizen_id, db, allow_anonymous=True)
     service = NormalizationService(db)
     try:
         summary = await service.normalize_submission(submission_id, data.citizen_id)
@@ -318,7 +318,7 @@ async def complete_submission(
     Attempts completion. Returns 422 with the missing required question
     codes when applicable required questions are unanswered.
     """
-    await require_same_citizen(user, data.citizen_id, db)
+    await require_same_citizen(user, data.citizen_id, db, allow_anonymous=True)
     service = SubmissionService(db)
     try:
         return await service.complete_submission(submission_id, data.citizen_id)

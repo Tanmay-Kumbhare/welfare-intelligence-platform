@@ -23,6 +23,7 @@ from datetime import date
 import pytest
 import pytest_asyncio
 from sqlalchemy import delete
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -196,6 +197,149 @@ async def test_delete_unreferenced_succeeds(db: AsyncSession):
     with pytest.raises(SchemeAdminError) as exc:
         await service.get(scheme.scheme_id)
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_duplicate_scheme_rejected(db: AsyncSession):
+    service = SchemeAdminService(db)
+    unique_name = f"Unique Scheme {uuid.uuid4().hex[:8]}"
+    scheme1 = await service.create(scheme_name=unique_name)
+    await db.flush()
+    assert scheme1.scheme_name == unique_name
+
+    with pytest.raises(SchemeAdminError) as exc:
+        await service.create(scheme_name=unique_name)
+    assert exc.value.status_code == 409
+    assert f"A scheme named '{unique_name}' already exists" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_create_duplicate_case_and_whitespace_rejected(db: AsyncSession):
+    service = SchemeAdminService(db)
+    base_name = f"Case Whitespace Probe {uuid.uuid4().hex[:8]}"
+    scheme = await service.create(scheme_name=base_name)
+    await db.flush()
+    assert scheme.scheme_name == base_name
+
+    # Different casing and surrounding whitespace
+    variations = [
+        f"   {base_name.upper()}   ",
+        f"  {base_name.lower()}  ",
+        base_name.upper(),
+        base_name.lower(),
+    ]
+    for variant in variations:
+        with pytest.raises(SchemeAdminError) as exc:
+            await service.create(scheme_name=variant)
+        assert exc.value.status_code == 409
+        assert "already exists" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_duplicate_rejection_matches_stored_scheme_with_surrounding_whitespace(
+    db: AsyncSession,
+):
+    """If an existing database row has untrimmed whitespace, duplicate checks still detect it."""
+    service = SchemeAdminService(db)
+    suffix = uuid.uuid4().hex[:8]
+    padded_raw_name = f"   Legacy Padded Scheme {suffix}   "
+    clean_name = f"Legacy Padded Scheme {suffix}"
+
+    # Insert directly into DB bypassing service._require_name to simulate pre-existing un-trimmed record
+    legacy_scheme = SchemeMaster(
+        scheme_name=padded_raw_name,
+        status="ACTIVE",
+        group_combining_operator="AND",
+        scheme_version=1,
+    )
+    db.add(legacy_scheme)
+    await db.flush()
+
+    # Attempt to create with clean/trimmed name
+    with pytest.raises(SchemeAdminError) as exc:
+        await service.create(scheme_name=clean_name)
+    assert exc.value.status_code == 409
+    assert f"A scheme named '{clean_name}' already exists" in exc.value.detail
+
+    # Attempt to create with lowercase variation
+    with pytest.raises(SchemeAdminError) as exc:
+        await service.create(scheme_name=clean_name.lower())
+    assert exc.value.status_code == 409
+    assert "already exists" in exc.value.detail
+
+    # Attempt to rename another scheme to this name
+    other_scheme = await service.create(scheme_name=f"Other Scheme {suffix}")
+    await db.flush()
+    with pytest.raises(SchemeAdminError) as exc:
+        await service.update(other_scheme.scheme_id, scheme_name=clean_name)
+    assert exc.value.status_code == 409
+    assert "already exists" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_update_rename_to_existing_scheme_rejected(db: AsyncSession):
+    service = SchemeAdminService(db)
+    suffix = uuid.uuid4().hex[:8]
+    scheme1 = await service.create(scheme_name=f"First Scheme {suffix}")
+    scheme2 = await service.create(scheme_name=f"Second Scheme {suffix}")
+    await db.flush()
+
+    # Renaming scheme2 to scheme1's name (exact)
+    with pytest.raises(SchemeAdminError) as exc:
+        await service.update(scheme2.scheme_id, scheme_name=f"First Scheme {suffix}")
+    assert exc.value.status_code == 409
+    assert "already exists" in exc.value.detail
+
+    # Renaming scheme2 to scheme1's name (case and whitespace variation)
+    with pytest.raises(SchemeAdminError) as exc:
+        await service.update(scheme2.scheme_id, scheme_name=f"  FIRST SCHEME {suffix}  ")
+    assert exc.value.status_code == 409
+    assert "already exists" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_update_other_fields_preserves_name(db: AsyncSession):
+    service = SchemeAdminService(db)
+    original_name = f"Preserve Name Probe {uuid.uuid4().hex[:8]}"
+    scheme = await service.create(scheme_name=original_name, description="initial")
+    await db.flush()
+
+    updated = await service.update(scheme.scheme_id, description="updated description")
+    assert updated.scheme_name == original_name
+    assert updated.description == "updated description"
+
+
+@pytest.mark.asyncio
+async def test_update_retains_own_name_succeeds(db: AsyncSession):
+    service = SchemeAdminService(db)
+    original_name = f"Self Retain Probe {uuid.uuid4().hex[:8]}"
+    scheme = await service.create(scheme_name=original_name)
+    await db.flush()
+
+    # Exact name update
+    updated = await service.update(
+        scheme.scheme_id, scheme_name=original_name, description="same name edit"
+    )
+    assert updated.scheme_name == original_name
+
+    # Whitespace-padded own name update
+    updated_ws = await service.update(
+        scheme.scheme_id, scheme_name=f"  {original_name}  "
+    )
+    assert updated_ws.scheme_name == original_name
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_handles_db_error(db: AsyncSession, monkeypatch):
+    service = SchemeAdminService(db)
+    async def failing_execute(*args, **kwargs):
+        raise SQLAlchemyError("Simulated query execution error")
+    monkeypatch.setattr(db, "execute", failing_execute)
+
+    with pytest.raises(SchemeAdminError) as exc:
+        await service.create(scheme_name="Error Probe")
+    assert exc.value.status_code == 500
+    assert "Database error" in exc.value.detail
 
 
 # ----------------------------------------------------------------------
@@ -612,3 +756,55 @@ def test_admin_list_schemes_contract(client, admin_token: str):
         "document_count",
     }
     assert expected_keys.issubset(rows[0].keys())
+
+
+def test_duplicate_scheme_rejected_over_http(client, admin_token: str):
+    """HTTP: duplicate creation returns 409, collision rename returns 409, self-rename succeeds."""
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    suffix1 = uuid.uuid4().hex[:8]
+    suffix2 = uuid.uuid4().hex[:8]
+    payload1 = _mk_scheme_payload(suffix1)
+    payload2 = _mk_scheme_payload(suffix2)
+
+    r1 = client.post("/api/v1/admin/schemes", headers=headers, json=payload1)
+    assert r1.status_code == 201, r1.text
+    id1 = r1.json()["scheme_id"]
+
+    r2 = client.post("/api/v1/admin/schemes", headers=headers, json=payload2)
+    assert r2.status_code == 201, r2.text
+    id2 = r2.json()["scheme_id"]
+
+    try:
+        # Duplicate create with different casing and whitespace -> 409
+        dup_payload = _mk_scheme_payload(f"dup_{suffix1}")
+        dup_payload["scheme_name"] = f"  {payload1['scheme_name'].lower()}  "
+        r_dup = client.post("/api/v1/admin/schemes", headers=headers, json=dup_payload)
+        assert r_dup.status_code == 409, r_dup.text
+        assert "already exists" in r_dup.json()["detail"]
+
+        # Rename scheme2 to scheme1's name -> 409
+        r_rename_collision = client.patch(
+            f"/api/v1/admin/schemes/{id2}",
+            headers=headers,
+            json={"scheme_name": payload1["scheme_name"].upper()},
+        )
+        assert r_rename_collision.status_code == 409, r_rename_collision.text
+
+        # Update scheme1 retaining its own name -> 200
+        r_self_update = client.patch(
+            f"/api/v1/admin/schemes/{id1}",
+            headers=headers,
+            json={"scheme_name": payload1["scheme_name"], "description": "self update"},
+        )
+        assert r_self_update.status_code == 200, r_self_update.text
+
+        # Update scheme1 without changing name (only description) -> 200
+        r_desc_update = client.patch(
+            f"/api/v1/admin/schemes/{id1}",
+            headers=headers,
+            json={"description": "desc only"},
+        )
+        assert r_desc_update.status_code == 200, r_desc_update.text
+    finally:
+        client.delete(f"/api/v1/admin/schemes/{id1}", headers=headers)
+        client.delete(f"/api/v1/admin/schemes/{id2}", headers=headers)

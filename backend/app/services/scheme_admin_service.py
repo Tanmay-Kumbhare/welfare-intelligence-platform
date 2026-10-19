@@ -25,6 +25,7 @@ import uuid
 from datetime import date, datetime, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assessment import EligibilityAssessment
@@ -154,6 +155,33 @@ class SchemeAdminService:
         if effective_start and effective_end and effective_end < effective_start:
             raise SchemeAdminError("end_date must not be before start_date", 400)
 
+    async def _check_duplicate_name(
+        self,
+        name: str,
+        *,
+        exclude_scheme_id: uuid.UUID | None = None,
+    ) -> None:
+        """Reject duplicate scheme names case-insensitively and whitespace-trimmed (409)."""
+        normalized_name = name.strip()
+        query = select(SchemeMaster.scheme_id).where(
+            func.lower(func.trim(SchemeMaster.scheme_name)) == func.lower(normalized_name)
+        )
+        if exclude_scheme_id is not None:
+            query = query.where(SchemeMaster.scheme_id != exclude_scheme_id)
+
+        try:
+            result = await self.db.execute(query)
+            existing = result.scalars().first()
+        except SQLAlchemyError as exc:
+            raise SchemeAdminError(
+                "Database error while checking scheme name uniqueness", 500
+            ) from exc
+
+        if existing is not None:
+            raise SchemeAdminError(
+                f"A scheme named '{normalized_name}' already exists", 409
+            )
+
     # ------------------------------------------------------------------
     # Queries
     # ------------------------------------------------------------------
@@ -239,6 +267,7 @@ class SchemeAdminService:
         application_window_type: str | None = None,
     ) -> SchemeMaster:
         name = self._require_name(scheme_name)
+        await self._check_duplicate_name(name)
         await self._validate_dates(start_date=start_date, end_date=end_date)
         status = self._enum(
             "status", status, ("ACTIVE", "INACTIVE")
@@ -326,7 +355,9 @@ class SchemeAdminService:
         scheme = await self.get(scheme_id)
 
         if scheme_name is not None:
-            scheme.scheme_name = self._require_name(scheme_name)
+            new_name = self._require_name(scheme_name)
+            await self._check_duplicate_name(new_name, exclude_scheme_id=scheme_id)
+            scheme.scheme_name = new_name
         if status is not None:
             scheme.status = self._enum("status", status, ("ACTIVE", "INACTIVE"))
         if scheme_category is not None:

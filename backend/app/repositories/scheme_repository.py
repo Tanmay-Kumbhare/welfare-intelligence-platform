@@ -19,20 +19,25 @@ class SchemeRepository:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
+    @staticmethod
+    def active_and_valid_criterion(as_of: date | None = None):
+        """Reusable SQL criterion for active schemes within their validity window."""
+        ref_date = as_of if as_of is not None else datetime.now(timezone.utc).date()
+        return (
+            SchemeMaster.status == "ACTIVE",
+            or_(SchemeMaster.start_date.is_(None), SchemeMaster.start_date <= ref_date),
+            or_(SchemeMaster.end_date.is_(None), SchemeMaster.end_date >= ref_date),
+        )
+
     async def get_all_active(self, as_of: date | None = None) -> Sequence[SchemeMaster]:
         """Fetch all active schemes with rules and documents eagerly loaded.
 
         Only schemes that are ACTIVE, have started (start_date is null or <= as_of),
         and have not expired (end_date is null or >= as_of) are returned.
         """
-        ref_date = as_of if as_of is not None else datetime.now(timezone.utc).date()
         result = await self.db.execute(
             select(SchemeMaster)
-            .where(
-                SchemeMaster.status == "ACTIVE",
-                or_(SchemeMaster.start_date.is_(None), SchemeMaster.start_date <= ref_date),
-                or_(SchemeMaster.end_date.is_(None), SchemeMaster.end_date >= ref_date),
-            )
+            .where(*self.active_and_valid_criterion(as_of))
             .options(
                 selectinload(SchemeMaster.rule_groups).selectinload(
                     SchemeMaster.rule_groups.property.mapper.class_.rules
@@ -68,14 +73,9 @@ class SchemeRepository:
         Only schemes that are ACTIVE, have started (start_date is null or <= as_of),
         and have not expired (end_date is null or >= as_of) are returned.
         """
-        ref_date = as_of if as_of is not None else datetime.now(timezone.utc).date()
         result = await self.db.execute(
             select(SchemeMaster)
-            .where(
-                SchemeMaster.status == "ACTIVE",
-                or_(SchemeMaster.start_date.is_(None), SchemeMaster.start_date <= ref_date),
-                or_(SchemeMaster.end_date.is_(None), SchemeMaster.end_date >= ref_date),
-            )
+            .where(*self.active_and_valid_criterion(as_of))
             .options(
                 joinedload(SchemeMaster.rule_groups).joinedload(
                     SchemeMaster.rule_groups.property.mapper.class_.rules

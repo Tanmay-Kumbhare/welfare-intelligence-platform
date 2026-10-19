@@ -70,6 +70,7 @@ class RecommendationItem(BaseModel):
     """Single item in a citizen's recommendations list."""
     scheme: SchemeResponse
     eligibility_result: bool
+    is_stale: bool = False
     rule_match_score: Optional[float] = None
     match_score: Optional[float] = None
     matched_rules: list[str] = []

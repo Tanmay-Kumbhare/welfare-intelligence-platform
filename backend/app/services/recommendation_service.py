@@ -83,7 +83,9 @@ def _compute_relevance_and_explanation(
     factors = []
 
     # 1. Eligibility status
-    if item.eligibility_result:
+    if getattr(item, "is_stale", False):
+        factors.append("Scheme rules changed since your last evaluation. Re-evaluation recommended.")
+    elif item.eligibility_result:
         factors.append("Eligible based on profile criteria")
     else:
         factors.append("Not currently eligible")

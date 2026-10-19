@@ -284,4 +284,122 @@ describe("ResultsPage Task 2 integration", () => {
 
     expect(screen.getByRole("button", { name: /open simulation/i })).toBeInTheDocument();
   });
+
+  it("renders prominent warning for stale eligible schemes and hides normal confirmation text", async () => {
+    const citizenId = "cit-stale-eligible";
+    api.citizenService.get.mockResolvedValue({
+      data: { citizen_id: citizenId, full_name: "Citizen Stale" },
+    });
+    api.eligibilityService.evaluate.mockResolvedValue({ data: [] });
+    api.recommendationService.getForCitizen.mockResolvedValue({
+      data: {
+        citizen_id: citizenId,
+        eligible_schemes: [
+          {
+            scheme: {
+              scheme_id: "sch-stale-1",
+              scheme_name: "Modified Subsidy Scheme",
+              status: "ACTIVE",
+            },
+            eligibility_result: true,
+            is_stale: true,
+            rule_match_score: 95.0,
+            recommendation_explanation: "Scheme rules changed since your last evaluation.",
+          },
+        ],
+        ineligible_schemes: [],
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/results/${citizenId}`]}>
+        <Routes>
+          <Route path="/results/:citizenId" element={<ResultsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Modified Subsidy Scheme")).toBeInTheDocument();
+    });
+
+    // Warning message and badges must be displayed
+    expect(
+      screen.getByText(
+        "Scheme rules have changed since your last evaluation. This result may no longer be accurate. Re-evaluate before relying on it."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/STALE/i).length).toBeGreaterThan(0);
+
+    // Normal confirmation text must NOT be displayed for stale items
+    expect(
+      screen.queryByText("Your information meets the stored eligibility requirements.")
+    ).not.toBeInTheDocument();
+
+    // Visual distinction: card has amber accent border, not green ok border
+    const cardElement = screen.getByText("Modified Subsidy Scheme").closest(".bg-paper-raised");
+    expect(cardElement).toHaveClass("border-l-accent");
+    expect(cardElement).not.toHaveClass("border-l-ok");
+  });
+
+  it("renders prominent warning for stale ineligible schemes as well", async () => {
+    const citizenId = "cit-stale-ineligible";
+    api.citizenService.get.mockResolvedValue({
+      data: { citizen_id: citizenId, full_name: "Citizen Ineligible Stale" },
+    });
+    api.eligibilityService.evaluate.mockResolvedValue({ data: [] });
+    api.recommendationService.getForCitizen.mockResolvedValue({
+      data: {
+        citizen_id: citizenId,
+        eligible_schemes: [],
+        ineligible_schemes: [
+          {
+            scheme: {
+              scheme_id: "sch-stale-2",
+              scheme_name: "Updated Pension Scheme",
+              status: "ACTIVE",
+            },
+            eligibility_result: false,
+            is_stale: true,
+            rule_match_score: 40.0,
+            reason: "Age threshold was updated.",
+          },
+        ],
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/results/${citizenId}`]}>
+        <Routes>
+          <Route path="/results/:citizenId" element={<ResultsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Updated Pension Scheme")).toBeInTheDocument();
+    });
+
+    // Warning message and badge must be present in ineligible section
+    expect(
+      screen.getByText(
+        "Scheme rules have changed since your last evaluation. This result may no longer be accurate. Re-evaluate before relying on it."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/STALE/i).length).toBeGreaterThan(0);
+
+    // Definitive ineligibility statement must NOT be displayed for stale items
+    expect(
+      screen.queryByText(
+        "You are not currently eligible because this eligibility condition was not satisfied."
+      )
+    ).not.toBeInTheDocument();
+
+    // Neutral statement must be displayed instead
+    expect(
+      screen.getByText(
+        "Your previous evaluation found that you did not meet the stored eligibility requirements. Because the scheme rules have changed, this result may no longer be accurate."
+      )
+    ).toBeInTheDocument();
+  });
 });

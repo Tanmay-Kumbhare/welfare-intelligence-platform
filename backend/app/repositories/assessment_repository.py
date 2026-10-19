@@ -5,9 +5,10 @@ Assessment repository — async SQLAlchemy queries for eligibility assessments.
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Any, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -48,10 +49,14 @@ class AssessmentRepository:
                 "reason": stmt.excluded.reason,
                 "evaluation_details": stmt.excluded.evaluation_details,
                 "assessment_date": stmt.excluded.assessment_date,
+                "updated_at": func.clock_timestamp(),
             },
         ).returning(EligibilityAssessment)
 
-        result = await self.db.execute(stmt)
+        result = await self.db.execute(
+            stmt,
+            execution_options={"populate_existing": True},
+        )
         return result.scalar_one()
 
     async def upsert_assessments(
@@ -78,25 +83,41 @@ class AssessmentRepository:
                 "reason": stmt.excluded.reason,
                 "evaluation_details": stmt.excluded.evaluation_details,
                 "assessment_date": stmt.excluded.assessment_date,
+                "updated_at": func.clock_timestamp(),
             },
         ).returning(EligibilityAssessment)
 
-        result = await self.db.execute(stmt)
+        result = await self.db.execute(
+            stmt,
+            execution_options={"populate_existing": True},
+        )
         return result.scalars().all()
 
     async def get_citizen_assessments(
-        self, citizen_id: uuid.UUID
+        self,
+        citizen_id: uuid.UUID,
+        active_only: bool = False,
+        as_of: date | None = None,
     ) -> Sequence[EligibilityAssessment]:
         """
         Fetch all assessments for a citizen, including the scheme and required documents.
+        When active_only is True, filters to schemes that are ACTIVE and within validity dates.
         """
-        result = await self.db.execute(
+        query = (
             select(EligibilityAssessment)
             .where(EligibilityAssessment.citizen_id == citizen_id)
-            .options(
-                selectinload(EligibilityAssessment.scheme).selectinload(
-                    SchemeMaster.documents
-                )
+        )
+        if active_only:
+            from app.repositories.scheme_repository import SchemeRepository
+
+            query = query.join(EligibilityAssessment.scheme).where(
+                *SchemeRepository.active_and_valid_criterion(as_of)
+            )
+
+        query = query.options(
+            selectinload(EligibilityAssessment.scheme).selectinload(
+                SchemeMaster.documents
             )
         )
+        result = await self.db.execute(query)
         return result.scalars().all()

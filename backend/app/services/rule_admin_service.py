@@ -315,7 +315,7 @@ class RuleAdminService:
         intra_group_operator: str = "AND",
         group_priority: int = 1,
     ) -> SchemeRuleGroup:
-        await self._require_scheme(scheme_id)
+        scheme = await self._require_scheme(scheme_id)
         name = self._require_text("group_name", group_name, 100)
         intra_group_operator = (
             self._enum("intra_group_operator", intra_group_operator, GROUP_OPERATORS)
@@ -327,6 +327,7 @@ class RuleAdminService:
             group_priority=group_priority,
         )
         self.db.add(group)
+        scheme.last_updated_at = _utcnow()
         await self.db.flush()
         # Re-fetch eagerly: the fresh object's `rules` relationship is not
         # loaded after flush, and async sessions cannot lazy-load it.
@@ -348,6 +349,7 @@ class RuleAdminService:
         change is explicit, validated against the existing AND|OR vocabulary,
         and semantics-tested. The change never alters individual rules.
         """
+        scheme = await self._require_scheme(scheme_id)
         group = await self.get_group(scheme_id, group_id)
         if group_name is not None:
             group.group_name = self._require_text("group_name", group_name, 100)
@@ -357,6 +359,7 @@ class RuleAdminService:
             )
         if group_priority is not None:
             group.group_priority = group_priority
+        scheme.last_updated_at = _utcnow()
         await self.db.flush()
         # Re-fetch eagerly (see create_group): the rules relationship must
         # be loaded for async serialization.
@@ -368,6 +371,7 @@ class RuleAdminService:
         The FK cascade would silently destroy rule provenance along with the
         rules, losing the rule→source citation chain — refused instead (409).
         """
+        scheme = await self._require_scheme(scheme_id)
         group = await self.get_group(scheme_id, group_id)
         rules = (
             (
@@ -387,6 +391,7 @@ class RuleAdminService:
                 409,
             )
         await self.db.delete(group)
+        scheme.last_updated_at = _utcnow()
         await self.db.flush()
 
     # ------------------------------------------------------------------
@@ -427,7 +432,7 @@ class RuleAdminService:
         The rule joins the scheme's live eligibility graph immediately —
         it is a hard gate the next evaluation consumes.
         """
-        await self._require_scheme(scheme_id)
+        scheme = await self._require_scheme(scheme_id)
         group = await self.get_group(scheme_id, group_id)  # validates association
         validated_value = self._validate_required_value(
             {
@@ -452,6 +457,7 @@ class RuleAdminService:
             remedy_template=remedy_template,
         )
         self.db.add(rule)
+        scheme.last_updated_at = _utcnow()
         await self.db.flush()
         return rule
 
@@ -475,6 +481,7 @@ class RuleAdminService:
         it does not freeze it (citation still applies to the rule id); only
         deletion is provenance-restricted.
         """
+        scheme = await self._require_scheme(scheme_id)
         rule = await self.get_rule(scheme_id, rule_id)
 
         if group_id is not None and group_id != rule.group_id:
@@ -512,6 +519,7 @@ class RuleAdminService:
         if remedy_template is not None:
             rule.remedy_template = remedy_template
 
+        scheme.last_updated_at = _utcnow()
         await self.db.flush()
         return rule
 
@@ -519,6 +527,7 @@ class RuleAdminService:
         """Hard delete a rule ONLY when it carries no source provenance (409).
         Assessment history is unaffected: assessments snapshot evidence
         against the scheme and are never recreated when rules change."""
+        scheme = await self._require_scheme(scheme_id)
         rule = await self.get_rule(scheme_id, rule_id)
         if await self._provenance_exists([rule.rule_id]):
             raise RuleAdminError(
@@ -527,6 +536,7 @@ class RuleAdminService:
                 409,
             )
         await self.db.delete(rule)
+        scheme.last_updated_at = _utcnow()
         await self.db.flush()
 
     # ------------------------------------------------------------------

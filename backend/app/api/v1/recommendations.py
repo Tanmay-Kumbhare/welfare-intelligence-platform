@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -32,7 +33,7 @@ async def get_citizen_recommendations(
         raise HTTPException(status_code=404, detail="Citizen not found")
 
     assessment_repo = AssessmentRepository(db)
-    assessments = await assessment_repo.get_citizen_assessments(citizen_id)
+    assessments = await assessment_repo.get_citizen_assessments(citizen_id, active_only=True)
 
     from app.services.document_service import DocumentService
     doc_service = DocumentService(db)
@@ -42,7 +43,40 @@ async def get_citizen_recommendations(
     eligible = []
     ineligible = []
 
+    ref_date = datetime.now(timezone.utc).date()
+
     for a in assessments:
+        scheme = a.scheme
+        if not scheme:
+            continue
+
+        # Redundant safety guard: verify status and validity dates
+        if scheme.status != "ACTIVE":
+            continue
+        if scheme.start_date and scheme.start_date > ref_date:
+            continue
+        if scheme.end_date and scheme.end_date < ref_date:
+            continue
+
+        eval_time = getattr(a, "updated_at", None) or getattr(a, "created_at", None)
+        is_stale = False
+        if scheme.last_updated_at and eval_time:
+            s_time = (
+                scheme.last_updated_at
+                if scheme.last_updated_at.tzinfo
+                else scheme.last_updated_at.replace(tzinfo=timezone.utc)
+            )
+            e_time = (
+                eval_time
+                if eval_time.tzinfo
+                else eval_time.replace(tzinfo=timezone.utc)
+            )
+            if s_time > e_time:
+                is_stale = True
+
+        reason = a.reason
+        if is_stale:
+            reason = "Scheme rules changed since your last evaluation. Re-evaluation recommended."
         scheme_documents = []
         is_complete = True
         
@@ -115,13 +149,14 @@ async def get_citizen_recommendations(
         item = RecommendationItem(
             scheme=a.scheme,
             eligibility_result=a.eligibility_result,
+            is_stale=is_stale,
             rule_match_score=rule_match_score,
             match_score=float(match_score) if match_score is not None else None,
             matched_rules=matched_rules,
             failed_rules=failed_rules,
             unknown_rules=unknown_rules,
             failed_mandatory_rules=failed_mandatory_rules,
-            reason=a.reason,
+            reason=reason,
             evaluation_details=a.evaluation_details,
             assessment_date=a.assessment_date,
             documents=a.scheme.documents,

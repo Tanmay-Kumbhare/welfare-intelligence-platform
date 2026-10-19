@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { CheckCircle, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -88,6 +88,30 @@ function RecommendationExplanation({ explanation }) {
 const SCORE_DISCLAIMER_TEXT =
   "Rule match score indicates criteria alignment based on stored profile information. It is not a guarantee of government grant approval or disbursement.";
 
+const STALE_WARNING_MESSAGE =
+  "Scheme rules have changed since your last evaluation. This result may no longer be accurate. Re-evaluate before relying on it.";
+
+function StaleEligibilityWarning() {
+  return (
+    <div
+      role="alert"
+      className="mt-4 p-3.5 bg-accent-tint/40 border border-accent/40 rounded flex items-start gap-3 text-xs"
+    >
+      <AlertTriangle className="h-4 w-4 text-accent-ink shrink-0 mt-0.5" aria-hidden="true" />
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Badge variant="neutral" className="font-semibold">
+            WARNING: STALE RESULT
+          </Badge>
+        </div>
+        <p className="text-accent-ink font-medium mb-0 leading-relaxed">
+          {STALE_WARNING_MESSAGE}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function ResultsPage() {
   const { citizenId } = useParams();
   const [data, setData] = useState(null);
@@ -169,12 +193,12 @@ export default function ResultsPage() {
 
     <section className="mb-10" aria-labelledby="eligible-heading">
       <div className="flex items-center gap-2 border-b border-line pb-2.5 mb-4.5"><CheckCircle className="h-5 w-5 text-ok" aria-hidden="true" /><h2 id="eligible-heading" className="text-2xl mb-0">Eligible schemes <span className="font-sans text-sm font-normal text-ink-soft">({eligible.length})</span></h2></div>
-      {eligible.length === 0 ? <EmptyState title="No evaluated schemes currently match..." message="No evaluated schemes currently match your information." /> : <div className="space-y-4">{eligible.map((item) => <Card key={item.scheme.scheme_id} eligible><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2 mb-2"><h3 className="text-xl mb-0">{item.scheme.scheme_name}</h3><RuleMatchScoreIndicator score={item.rule_match_score} /></div><SchemeMeta scheme={item.scheme} /></div><Button to={`/schemes/${item.scheme.scheme_id}`} variant="secondary" size="sm">View scheme</Button></div><p className="text-sm mt-4 mb-0">Your information meets the stored eligibility requirements.</p>{(item.scheme.benefit_description || item.scheme.description) && <p className="text-sm mt-2 mb-0">{item.scheme.benefit_description || item.scheme.description}</p>}<RecommendationExplanation explanation={item.recommendation_explanation} />{item.gap_analysis && <GapAnalysisCard gapAnalysis={item.gap_analysis} className="mt-4" />}<SchemeDocuments item={item} /></Card>)}</div>}
+      {eligible.length === 0 ? <EmptyState title="No evaluated schemes currently match..." message="No evaluated schemes currently match your information." /> : <div className="space-y-4">{eligible.map((item) => <Card key={item.scheme.scheme_id} eligible={!item.is_stale} className={item.is_stale ? "border-l-4 border-l-accent" : ""}><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2 mb-2"><h3 className="text-xl mb-0">{item.scheme.scheme_name}</h3><RuleMatchScoreIndicator score={item.rule_match_score} />{item.is_stale && <Badge variant="neutral" className="font-semibold">STALE</Badge>}</div><SchemeMeta scheme={item.scheme} /></div><Button to={`/schemes/${item.scheme.scheme_id}`} variant="secondary" size="sm">View scheme</Button></div>{item.is_stale ? <StaleEligibilityWarning /> : <p className="text-sm mt-4 mb-0">Your information meets the stored eligibility requirements.</p>}{(item.scheme.benefit_description || item.scheme.description) && <p className="text-sm mt-2 mb-0">{item.scheme.benefit_description || item.scheme.description}</p>}<RecommendationExplanation explanation={item.recommendation_explanation} />{item.gap_analysis && <GapAnalysisCard gapAnalysis={item.gap_analysis} className="mt-4" />}<SchemeDocuments item={item} /></Card>)}</div>}
     </section>
 
     <section className="mb-10" aria-labelledby="excluded-heading">
       <div className="flex items-center gap-2 border-b border-line pb-2.5 mb-4.5"><XCircle className="h-5 w-5 text-excl" aria-hidden="true" /><h2 id="excluded-heading" className="text-2xl mb-0">Not currently eligible <span className="font-sans text-sm font-normal text-ink-soft">({ineligible.length})</span></h2></div>
-      {ineligible.length === 0 ? <EmptyState title="All evaluated schemes match your current information." /> : <div className="space-y-4">{ineligible.map((item) => <Card key={item.scheme.scheme_id}><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2 mb-2"><h3 className="text-xl mb-0">{item.scheme.scheme_name}</h3><RuleMatchScoreIndicator score={item.rule_match_score} /></div><SchemeMeta scheme={item.scheme} /></div><div className="flex flex-wrap gap-2"><Button to={`/why-excluded/${citizenId}/${item.scheme.scheme_id}`} variant="secondary" size="sm">Why excluded?</Button><Button to={`/schemes/${item.scheme.scheme_id}`} variant="ghost" size="sm">View scheme</Button></div></div><p className="text-sm text-excl-ink mt-4 mb-2">You are not currently eligible because this eligibility condition was not satisfied.</p>{item.reason && <p className="text-sm mb-3">{item.reason}</p>}<RecommendationExplanation explanation={item.recommendation_explanation} />{item.gap_analysis && <GapAnalysisCard gapAnalysis={item.gap_analysis} className="mt-4 mb-2" />}{item.alternative_schemes && item.alternative_schemes.length > 0 && <AlternativeSchemesCard alternatives={item.alternative_schemes} targetSchemeId={item.scheme.scheme_id} className="mt-4 mb-2" />}<div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft border-t border-line pt-3 mt-3"><span>Failed rule count: {countFailedRules(item.evaluation_details)}</span></div><details className="border-t border-line pt-3"><summary className="cursor-pointer text-sm font-medium text-ink">Show failed eligibility rules</summary><div className="mt-3"><RuleEvaluationDetails details={item.evaluation_details} failedOnly /></div></details></Card>)}</div>}
+      {ineligible.length === 0 ? <EmptyState title="All evaluated schemes match your current information." /> : <div className="space-y-4">{ineligible.map((item) => <Card key={item.scheme.scheme_id} className={item.is_stale ? "border-l-4 border-l-accent" : ""}><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2 mb-2"><h3 className="text-xl mb-0">{item.scheme.scheme_name}</h3><RuleMatchScoreIndicator score={item.rule_match_score} />{item.is_stale && <Badge variant="neutral" className="font-semibold">STALE</Badge>}</div><SchemeMeta scheme={item.scheme} /></div><div className="flex flex-wrap gap-2"><Button to={`/why-excluded/${citizenId}/${item.scheme.scheme_id}`} variant="secondary" size="sm">Why excluded?</Button><Button to={`/schemes/${item.scheme.scheme_id}`} variant="ghost" size="sm">View scheme</Button></div></div>{item.is_stale ? (<><StaleEligibilityWarning /><p className="text-sm text-ink-soft mt-4 mb-2">Your previous evaluation found that you did not meet the stored eligibility requirements. Because the scheme rules have changed, this result may no longer be accurate.</p></>) : (<p className="text-sm text-excl-ink mt-4 mb-2">You are not currently eligible because this eligibility condition was not satisfied.</p>)}{item.reason && <p className="text-sm mb-3">{item.reason}</p>}<RecommendationExplanation explanation={item.recommendation_explanation} />{item.gap_analysis && <GapAnalysisCard gapAnalysis={item.gap_analysis} className="mt-4 mb-2" />}{item.alternative_schemes && item.alternative_schemes.length > 0 && <AlternativeSchemesCard alternatives={item.alternative_schemes} targetSchemeId={item.scheme.scheme_id} className="mt-4 mb-2" />}<div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft border-t border-line pt-3 mt-3"><span>Failed rule count: {countFailedRules(item.evaluation_details)}</span></div><details className="border-t border-line pt-3"><summary className="cursor-pointer text-sm font-medium text-ink">Show failed eligibility rules</summary><div className="mt-3"><RuleEvaluationDetails details={item.evaluation_details} failedOnly /></div></details></Card>)}</div>}
     </section>
 
     <div className="flex flex-wrap gap-3 border-t border-line pt-6"><Button to="/check-eligibility" variant="primary">Check eligibility again</Button><Button to="/profile" variant="secondary">My profile</Button>{citizen?.location?.state && <span className="text-xs text-ink-soft self-center">Location: {citizen.location.state}</span>}</div>

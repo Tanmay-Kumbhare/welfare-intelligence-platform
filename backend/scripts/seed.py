@@ -63,6 +63,14 @@ async def seed_data():
 
         for s_data in data["schemes"]:
             if s_data["scheme_name"] in existing_names:
+                if s_data.get("target_persona"):
+                    existing_scheme = (
+                        await session.execute(
+                            select(SchemeMaster).where(SchemeMaster.scheme_name == s_data["scheme_name"])
+                        )
+                    ).scalar_one_or_none()
+                    if existing_scheme and not existing_scheme.target_persona:
+                        existing_scheme.target_persona = s_data["target_persona"]
                 logger.info(f"Skipping existing scheme: {s_data['scheme_name']}")
                 skipped += 1
                 continue
@@ -77,6 +85,7 @@ async def seed_data():
                 official_source_url=s_data.get("official_source_url"),
                 application_url=s_data.get("application_url"),
                 group_combining_operator=s_data.get("group_combining_operator", "AND"),
+                target_persona=s_data.get("target_persona"),
             )
             session.add(scheme)
             await session.flush()

@@ -77,7 +77,8 @@ class AlternativeSchemeService:
                 and target_persona.upper() != "GENERAL"
                 and target_persona.upper() == c_persona.upper()
             )
-            is_eligible = bool(candidate.eligibility_result)
+            is_stale = bool(getattr(candidate, "is_stale", False))
+            is_eligible = bool(candidate.eligibility_result) and not is_stale
 
             # A candidate is viable if it shares category, persona, is eligible, or has strong match score
             if not (is_same_category or is_same_persona or is_eligible or c_score >= 50.0):

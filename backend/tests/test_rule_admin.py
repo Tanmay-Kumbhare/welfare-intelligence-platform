@@ -76,7 +76,7 @@ async def db():
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 # ----------------------------------------------------------------------
@@ -101,12 +101,24 @@ def test_rule_vocabularies_match_engine():
         "employment_status",
         "social_category",
         "education_level",
+        "currently_studying",
+        "is_studying",
+        "is_enrolled",
+        "is_currently_enrolled",
         "disability_status",
         "area_type",
         "state",
         "tenth_percentage",
         "twelfth_percentage",
         "twelfth_percentile",
+        "graduation_percentage",
+        "graduation_cgpa",
+        "current_education_level",
+        "current_degree",
+        "current_branch",
+        "current_year",
+        "current_semester",
+        "highest_education_level",
         "livestock_cattle_count",
         "livestock_poultry_count",
     }
@@ -315,6 +327,179 @@ async def test_rule_value_validation_rejects(db, parameter_name, operator, requi
             required_value=required_value,
         )
     assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_admin_student_and_academic_rules_creation(db: AsyncSession):
+    """Admin can create rules using currently_studying, aliases, and academic parameters."""
+    service = RuleAdminService(db)
+    scheme = _mk_scheme(db)
+    await db.flush()
+    group = await service.create_group(scheme.scheme_id, group_name="Academic & Enrollment")
+    await db.flush()
+
+    # 1. currently_studying (boolean)
+    r1 = await service.create_rule(
+        scheme.scheme_id,
+        group_id=group.group_id,
+        parameter_name="currently_studying",
+        operator="==",
+        required_value="true",
+    )
+    assert r1.parameter_name == "currently_studying"
+    assert r1.operator == "=="
+    assert r1.required_value == "true"
+
+    # 2. aliases
+    for alias in ("is_studying", "is_enrolled", "is_currently_enrolled"):
+        r_alias = await service.create_rule(
+            scheme.scheme_id,
+            group_id=group.group_id,
+            parameter_name=alias,
+            operator="==",
+            required_value="false",
+        )
+        assert r_alias.parameter_name == alias
+
+    # 3. graduation_percentage (numeric)
+    r_pct = await service.create_rule(
+        scheme.scheme_id,
+        group_id=group.group_id,
+        parameter_name="graduation_percentage",
+        operator=">=",
+        required_value="60.5",
+    )
+    assert r_pct.parameter_name == "graduation_percentage"
+    assert r_pct.required_value == "60.5"
+
+    # 4. graduation_cgpa (numeric)
+    r_cgpa = await service.create_rule(
+        scheme.scheme_id,
+        group_id=group.group_id,
+        parameter_name="graduation_cgpa",
+        operator=">=",
+        required_value="7.5",
+    )
+    assert r_cgpa.parameter_name == "graduation_cgpa"
+    assert r_cgpa.required_value == "7.5"
+
+    # 5. current_degree and current_education_level (string)
+    r_deg = await service.create_rule(
+        scheme.scheme_id,
+        group_id=group.group_id,
+        parameter_name="current_degree",
+        operator="==",
+        required_value="B.Tech",
+    )
+    assert r_deg.parameter_name == "current_degree"
+    assert r_deg.required_value == "B.Tech"
+
+    r_edu = await service.create_rule(
+        scheme.scheme_id,
+        group_id=group.group_id,
+        parameter_name="current_education_level",
+        operator="IN",
+        required_value="UNDERGRADUATE, POSTGRADUATE",
+    )
+    assert r_edu.parameter_name == "current_education_level"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "parameter_name,operator,required_value",
+    [
+        ("currently_studying", ">=", "true"),  # boolean doesn't support ordering
+        ("currently_studying", "==", "MAYBE"),  # invalid boolean value
+        ("is_studying", "<", "false"),  # ordering invalid for alias
+        ("graduation_percentage", ">=", "eighty"),  # non-numeric percentage
+        ("graduation_cgpa", ">=", "distinction"),  # non-numeric cgpa
+        ("favourite_subject", "==", "Math"),  # unknown parameter
+        ("academic_rank", ">=", "1"),  # unknown parameter
+    ],
+)
+async def test_admin_student_and_academic_rules_validation_rejects(
+    db: AsyncSession, parameter_name, operator, required_value
+):
+    service = RuleAdminService(db)
+    scheme = _mk_scheme(db)
+    await db.flush()
+    group = await service.create_group(scheme.scheme_id, group_name="G")
+    await db.flush()
+    with pytest.raises(RuleAdminError) as exc:
+        await service.create_rule(
+            scheme.scheme_id,
+            group_id=group.group_id,
+            parameter_name=parameter_name,
+            operator=operator,
+            required_value=required_value,
+        )
+    assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_admin_created_student_rule_evaluates_with_engine(db: AsyncSession):
+    """A rule created with currently_studying == true evaluates correctly in EligibilityEngine:
+    passed when TRUE, failed when FALSE, and not confirmed eligible when missing or invalid."""
+    service = RuleAdminService(db)
+    scheme = _mk_scheme(db)
+    scheme.group_combining_operator = "AND"
+    await db.flush()
+    group = await service.create_group(scheme.scheme_id, group_name="Enrollment Gate")
+    await db.flush()
+    rule = await service.create_rule(
+        scheme.scheme_id,
+        group_id=group.group_id,
+        parameter_name="currently_studying",
+        operator="==",
+        required_value="true",
+    )
+    await db.flush()
+
+    eval_scheme = SchemeMaster(
+        scheme_name="Admin Student Scheme",
+        group_combining_operator="AND",
+    )
+    eval_group = SchemeRuleGroup(
+        group_name="Enrollment Gate",
+        intra_group_operator="AND",
+    )
+    eval_group.rules = [rule]
+    eval_scheme.rule_groups = [eval_group]
+
+    citizen = CitizenMaster(
+        full_name="Student Probe",
+        citizen_type="GENERAL",
+        date_of_birth=date(2003, 5, 15),
+    )
+    engine = EligibilityEngine()
+
+    # 1. Citizen with confirmed enrollment fact passes
+    result_true, details_true, _ = engine.evaluate_scheme(
+        citizen, eval_scheme, facts_dict={"CURRENTLY_STUDYING": "TRUE"}
+    )
+    assert result_true is True
+    assert details_true["overall_result"] is True
+
+    # 2. Citizen with confirmed non-enrollment fact fails
+    result_false, details_false, _ = engine.evaluate_scheme(
+        citizen, eval_scheme, facts_dict={"CURRENTLY_STUDYING": "FALSE"}
+    )
+    assert result_false is False
+    assert details_false["overall_result"] is False
+
+    # 3. Citizen with missing fact fails (not confirmed eligible)
+    result_missing, details_missing, _ = engine.evaluate_scheme(
+        citizen, eval_scheme, facts_dict={}
+    )
+    assert result_missing is False
+    assert details_missing["overall_result"] is False
+
+    # 4. Citizen with invalid fact ('MAYBE') fails (treated as missing/unknown)
+    result_invalid, details_invalid, _ = engine.evaluate_scheme(
+        citizen, eval_scheme, facts_dict={"CURRENTLY_STUDYING": "MAYBE"}
+    )
+    assert result_invalid is False
+    assert details_invalid["overall_result"] is False
 
 
 @pytest.mark.asyncio
@@ -596,10 +781,12 @@ def test_passing_higher_priority_rule_never_overrides_mandatory_failure():
 def client():
     from fastapi.testclient import TestClient
 
+    from app.database import engine
     from app.main import app
 
     with TestClient(app) as c:
         yield c
+    _run(engine.dispose())
 
 
 def _make_user_with_role(role: str | None) -> dict:

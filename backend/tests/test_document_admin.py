@@ -75,7 +75,7 @@ async def db():
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 # ----------------------------------------------------------------------
@@ -343,10 +343,12 @@ async def test_verify_sets_both_fields_and_metadata_edit_does_not(db):
 def client():
     from fastapi.testclient import TestClient
 
+    from app.database import engine
     from app.main import app
 
     with TestClient(app) as c:
         yield c
+    _run(engine.dispose())
 
 
 def _make_user_with_role(role: str | None) -> dict:

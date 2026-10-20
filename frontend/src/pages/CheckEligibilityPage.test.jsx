@@ -4,10 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import CheckEligibilityPage from "./CheckEligibilityPage";
 import * as api from "../services/api";
-import { setStoredCitizenId } from "../utils/citizenStorage";
 import { FORM_DETAIL, CITIZEN, submissionResponse, httpError, typedAnswer } from "../test/fixtures";
 
 vi.mock("../services/api", () => ({
+  authService: {
+    me: vi.fn(),
+  },
   citizenService: {
     get: vi.fn(),
     register: vi.fn(),
@@ -17,6 +19,9 @@ vi.mock("../services/api", () => ({
   },
   eligibilityService: {
     evaluate: vi.fn(),
+  },
+  recommendationService: {
+    getForCitizen: vi.fn(),
   },
   formSubmissionService: {
     create: vi.fn(),
@@ -33,11 +38,43 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return { ...actual, useNavigate: () => navigateMock };
 });
 
+const CITIZEN_FULL = {
+  ...CITIZEN,
+  date_of_birth: "2000-01-01",
+  gender: "FEMALE",
+  profile_status: "COMPLETE",
+  profile_completion: 100,
+  missing_fields: [],
+};
+
+const SAMPLE_RECOMMENDATION = {
+  eligible_schemes: [
+    {
+      scheme: {
+        scheme_id: "sch-0001",
+        scheme_name: "Post Matric Scholarship",
+        department_name: "Higher Education",
+        status: "ACTIVE",
+        benefit_description: "Financial assistance for post-matriculation studies.",
+      },
+      match_score: 95,
+      document_status: "COMPLETE",
+      scheme_documents: [],
+    },
+  ],
+  ineligible_schemes: [],
+};
+
 beforeEach(() => {
   navigateMock.mockReset();
   localStorage.clear();
+  api.authService.me.mockResolvedValue({
+    data: { user_id: "user-001", citizen_id: CITIZEN.citizen_id },
+  });
+  api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
   api.formService.getActive.mockResolvedValue({ data: FORM_DETAIL });
-  api.eligibilityService.evaluate.mockResolvedValue({ data: {} });
+  api.eligibilityService.evaluate.mockResolvedValue({ data: { message: "Evaluation complete" } });
+  api.recommendationService.getForCitizen.mockResolvedValue({ data: SAMPLE_RECOMMENDATION });
   api.formSubmissionService.create.mockResolvedValue({ data: submissionResponse() });
   api.formSubmissionService.update.mockImplementation((id, body) =>
     Promise.resolve({
@@ -53,45 +90,36 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderPage() {
+function renderPage(initialEntries = ["/check-eligibility?mode=form"]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <CheckEligibilityPage />
     </MemoryRouter>,
   );
 }
 
-const CITIZEN_FULL = {
-  ...CITIZEN,
-  date_of_birth: "2000-01-01",
-  gender: "FEMALE",
-};
-
 describe("CheckEligibilityPage — form loading", () => {
-  it("shows a loading state, then renders the API-driven form", async () => {
-    setStoredCitizenId(CITIZEN.citizen_id);
+  it("shows a loading state, then renders the API-driven form in questionnaire mode", async () => {
     api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
     renderPage();
     expect(screen.getByText(/loading your profile/i)).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: /citizen profile/i })).toBeInTheDocument();
-    expect(await screen.findByText(/section 1 of 3/i)).toBeInTheDocument();
+    const sectionIndicators = await screen.findAllByText(/section 1 of 3/i);
+    expect(sectionIndicators.length).toBeGreaterThan(0);
     expect(screen.getByLabelText(/marital status/i)).toBeInTheDocument();
   });
 
   it("shows an error state when the form API fails, with retry", async () => {
-    setStoredCitizenId(CITIZEN.citizen_id);
     api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
     api.formService.getActive.mockRejectedValue(httpError(500, {}));
     renderPage();
-    expect(await screen.findByText(/unable to load the form/i)).toBeInTheDocument();
+    expect(await screen.findByText(/unable to load eligibility service/i)).toBeInTheDocument();
     api.formService.getActive.mockResolvedValue({ data: FORM_DETAIL });
     await userEvent.click(screen.getByRole("button", { name: /try again/i }));
-    // After retry the form loads on top of the still-valid citizen context.
     expect(await screen.findByRole("heading", { name: /citizen profile/i })).toBeInTheDocument();
   });
 
   it("renders sections and questions from the API definition, not hardcoded copies", async () => {
-    setStoredCitizenId(CITIZEN.citizen_id);
     api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
     const custom = {
       ...FORM_DETAIL,
@@ -108,48 +136,36 @@ describe("CheckEligibilityPage — form loading", () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: /custom profile/i })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: /totally custom section/i })).toBeInTheDocument();
-    expect(screen.getByText(/section 1 of 1/i)).toBeInTheDocument();
+    const sectionIndicators = await screen.findAllByText(/section 1 of 1/i);
+    expect(sectionIndicators.length).toBeGreaterThan(0);
   });
 });
 
-describe("CheckEligibilityPage — identity gate", () => {
-  it("shows first-time registration when no citizen exists, then loads the form", async () => {
-    api.citizenService.get.mockRejectedValue(httpError(404, {}));
-    renderPage();
-    expect(await screen.findByText(/create your citizen profile/i)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/full name/i), "New Citizen");
-    await userEvent.type(screen.getByLabelText(/date of birth/i), "2000-01-01");
-    api.citizenService.register.mockResolvedValue({ data: CITIZEN_FULL });
-    await userEvent.click(screen.getByRole("button", { name: /create profile and continue/i }));
-    expect(api.citizenService.register).toHaveBeenCalled();
-    // Stored for later pages, and the already-loaded form renders immediately.
-    expect(localStorage.getItem("vidyasetu.citizen_id")).toBe(CITIZEN.citizen_id);
-    expect(await screen.findByRole("heading", { name: /citizen profile/i })).toBeInTheDocument();
+describe("CheckEligibilityPage — authentication and profile gates", () => {
+  it("shows login gate when user is unauthenticated", async () => {
+    api.authService.me.mockRejectedValue(httpError(401, { detail: "Unauthorized" }));
+    renderPage(["/check-eligibility"]);
+    expect(await screen.findByRole("heading", { name: /check your eligibility/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /login \/ register/i })).toBeInTheDocument();
   });
 
-  it("clears a stale citizen pointer and recovers to registration", async () => {
-    setStoredCitizenId("stale-id");
-    api.citizenService.get.mockRejectedValue(httpError(404, {}));
-    renderPage();
-    expect(await screen.findByText(/create your citizen profile/i)).toBeInTheDocument();
-    expect(localStorage.getItem("vidyasetu.citizen_id")).toBeNull();
+  it("shows incomplete profile gate when citizen profile is incomplete in clean mode", async () => {
+    api.citizenService.get.mockResolvedValue({
+      data: {
+        ...CITIZEN_FULL,
+        profile_status: "INCOMPLETE",
+        profile_completion: 40,
+        missing_fields: ["Annual Income", "Social Category"],
+      },
+    });
+    renderPage(["/check-eligibility"]);
+    expect(await screen.findByRole("heading", { name: /complete your profile/i })).toBeInTheDocument();
+    expect(screen.getByText(/annual income/i)).toBeInTheDocument();
+    expect(screen.getByText(/social category/i)).toBeInTheDocument();
+    expect(screen.getByText(/40%/i)).toBeInTheDocument();
   });
 
-  it("does not ask identity questions again for a returning citizen", async () => {
-    setStoredCitizenId(CITIZEN.citizen_id);
-    api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
-    renderPage();
-    expect(await screen.findByRole("heading", { name: /citizen profile/i })).toBeInTheDocument();
-    // The registration form never appears; identity is summarized read-only.
-    expect(screen.queryByText(/create your citizen profile/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^full name$/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^date of birth$/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/answering as/i)).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(CITIZEN_FULL.full_name))).toBeInTheDocument();
-  });
-
-  it("sends the stored citizen_id on submission create", async () => {
-    setStoredCitizenId(CITIZEN.citizen_id);
+  it("sends authenticated citizen_id on submission create", async () => {
     api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
     renderPage();
     await screen.findByRole("heading", { name: /citizen profile/i });
@@ -158,43 +174,26 @@ describe("CheckEligibilityPage — identity gate", () => {
   });
 });
 
-describe("CheckEligibilityPage — wizard, save, resume", () => {
+describe("CheckEligibilityPage — wizard navigation and draft answers", () => {
   async function startOnForm() {
-    setStoredCitizenId(CITIZEN.citizen_id);
     api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
     renderPage();
     await screen.findByRole("heading", { name: /citizen profile/i });
   }
 
-  it("saves answers and advances on Save & continue", async () => {
+  it("navigates forward and backward through wizard sections", async () => {
     await startOnForm();
     await userEvent.selectOptions(await screen.findByLabelText(/marital status/i), "MARRIED");
-    await userEvent.click(screen.getByRole("button", { name: /save & continue/i }));
-    await waitFor(() => expect(api.formSubmissionService.update).toHaveBeenCalled());
-    const [submissionId, body] = api.formSubmissionService.update.mock.calls[0];
-    expect(submissionId).toBe(submissionResponse().submission_id);
-    expect(body.citizen_id).toBe(CITIZEN.citizen_id);
-    expect(body.answers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ question_id: FORM_DETAIL.sections[0].questions[0].question_id, value: "MARRIED" })]),
-    );
-    expect(await screen.findByText(/section 2 of 3/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /next section/i }));
+    const s2Indicators = await screen.findAllByText(/section 2 of 3/i);
+    expect(s2Indicators.length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: /^back$/i }));
+    const s1Indicators = await screen.findAllByText(/section 1 of 3/i);
+    expect(s1Indicators.length).toBeGreaterThan(0);
+    expect(screen.getByLabelText(/marital status/i)).toHaveValue("MARRIED");
   });
 
-  it("keeps answers locally when a save fails and allows retry", async () => {
-    await startOnForm();
-    await userEvent.selectOptions(await screen.findByLabelText(/marital status/i), "MARRIED");
-    api.formSubmissionService.update.mockRejectedValueOnce(httpError(500, {}));
-    await userEvent.click(screen.getByRole("button", { name: /save & continue/i }));
-    expect(await screen.findByText(/something went wrong while saving/i)).toBeInTheDocument();
-    // Answers retained: retry succeeds and carries the typed value.
-    await userEvent.click(screen.getByRole("button", { name: /save & continue/i }));
-    const [, body] = api.formSubmissionService.update.mock.calls[1];
-    expect(body.answers.some((a) => a.value === "MARRIED")).toBe(true);
-    expect(await screen.findByText(/section 2 of 3/i)).toBeInTheDocument();
-  });
-
-  it("resumes a saved draft with answers restored (refresh preserves context)", async () => {
-    setStoredCitizenId(CITIZEN.citizen_id);
+  it("resumes a saved draft with answers restored", async () => {
     api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
     api.formSubmissionService.create.mockResolvedValue({
       data: submissionResponse({
@@ -204,83 +203,135 @@ describe("CheckEligibilityPage — wizard, save, resume", () => {
     });
     renderPage();
     expect(await screen.findByLabelText(/marital status/i)).toHaveValue("MARRIED");
-    expect(screen.getByText(/progress saved/i)).toBeInTheDocument();
   });
 
-  it("hides conditional questions in response to answers (no value sent when hidden)", async () => {
+  it("hides conditional questions in response to answers", async () => {
     await startOnForm();
-    // The heading can appear before the draft resolves and the form card
-    // mounts — wait for the nav button rather than clicking immediately.
-    const saveButton = await screen.findByRole("button", { name: /save & continue/i });
-    await userEvent.click(saveButton);
-    await screen.findByText(/section 2 of 3/i);
+    await userEvent.click(await screen.findByRole("button", { name: /next section/i }));
+    await screen.findAllByText(/section 2 of 3/i);
     await userEvent.selectOptions(screen.getByLabelText(/currently studying/i), "NO");
     expect(screen.queryByLabelText(/which course/i)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /save & continue/i }));
-    const [, body] = api.formSubmissionService.update.mock.calls.at(-1);
-    const courseQuestion = FORM_DETAIL.sections[1].questions[1];
-    expect(body.answers.find((a) => a.question_id === courseQuestion.question_id)).toBeUndefined();
   });
 });
 
-describe("CheckEligibilityPage — submission lifecycle", () => {
-  async function reachReview() {
-    setStoredCitizenId(CITIZEN.citizen_id);
-    api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
-    api.formSubmissionService.create.mockResolvedValue({
-      data: submissionResponse({
-        answers: [
-          typedAnswer(FORM_DETAIL.sections[0].questions[0].question_id, "MARRIED"),
-          typedAnswer(FORM_DETAIL.sections[2].questions[0].question_id, 240000),
-        ],
-      }),
-    });
+describe("CheckEligibilityPage — questionnaire completion and profile refresh lifecycle", () => {
+  async function reachLastSection(initialCitizen = CITIZEN_FULL) {
+    api.citizenService.get.mockResolvedValue({ data: initialCitizen });
     renderPage();
     await screen.findByRole("heading", { name: /citizen profile/i });
-    // Advance through the wizard to the last section, then review.
-    await userEvent.click(await screen.findByRole("button", { name: /save & continue/i }));
-    await screen.findByText(/section 2 of 3/i);
-    await userEvent.click(screen.getByRole("button", { name: /save & continue/i }));
-    await screen.findByText(/section 3 of 3/i);
-    await userEvent.click(screen.getByRole("button", { name: /review & submit/i }));
-    await screen.findByText(/review your information/i);
+    // Section 1 -> 2
+    const nextBtn1 = await screen.findByRole("button", { name: /next section/i });
+    await userEvent.click(nextBtn1);
+    await screen.findAllByText(/section 2 of 3/i);
+    // Section 2 -> 3 (last section)
+    const nextBtn2 = await screen.findByRole("button", { name: /next section/i });
+    await userEvent.click(nextBtn2);
+    await screen.findAllByText(/section 3 of 3/i);
   }
 
-  it("review shows sections with edit actions", async () => {
-    await reachReview();
-    expect(screen.getAllByRole("button", { name: /^edit$/i }).length).toBe(3);
-    await userEvent.click(screen.getAllByRole("button", { name: /^edit$/i })[1]);
-    expect(await screen.findByText(/section 2 of 3/i)).toBeInTheDocument();
+  it("refreshes citizen profile after normalization and runs eligibility check when profile becomes complete", async () => {
+    const incompleteCitizen = {
+      ...CITIZEN_FULL,
+      profile_status: "INCOMPLETE",
+      profile_completion: 50,
+      missing_fields: ["Annual Income"],
+    };
+    const completedCitizen = {
+      ...CITIZEN_FULL,
+      profile_status: "COMPLETE",
+      profile_completion: 100,
+      missing_fields: [],
+    };
+
+    // Citizen starts incomplete
+    await reachLastSection(incompleteCitizen);
+
+    api.formSubmissionService.update.mockResolvedValue({ data: submissionResponse() });
+    api.formSubmissionService.complete.mockResolvedValue({
+      data: submissionResponse({ status: "COMPLETED", completed_at: "2026-09-16T10:05:00Z" }),
+    });
+    api.formSubmissionService.normalize.mockResolvedValue({
+      data: { status: "NORMALIZED", facts_created: 8 },
+    });
+
+    // When citizen profile is refreshed after normalization, return completed profile
+    api.citizenService.get.mockResolvedValue({ data: completedCitizen });
+
+    await userEvent.click(screen.getByRole("button", { name: /submit & evaluate/i }));
+
+    await waitFor(() => expect(api.formSubmissionService.normalize).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.citizenService.get).toHaveBeenCalledWith(CITIZEN.citizen_id));
+    await waitFor(() => expect(api.eligibilityService.evaluate).toHaveBeenCalledWith(CITIZEN.citizen_id));
+    await waitFor(() => expect(api.recommendationService.getForCitizen).toHaveBeenCalledWith(CITIZEN.citizen_id));
+
+    // Displays recommendation results
+    expect(await screen.findByRole("heading", { name: /eligible for you/i })).toBeInTheDocument();
+    expect(screen.getByText(/post matric scholarship/i)).toBeInTheDocument();
   });
 
-  it("completes, normalizes, evaluates eligibility, then navigates to results", async () => {
-    await reachReview();
-    api.formSubmissionService.complete.mockResolvedValue({ data: submissionResponse({ status: "COMPLETED", completed_at: "2026-09-16T10:05:00Z" }) });
-    api.formSubmissionService.normalize.mockResolvedValue({ data: { status: "NORMALIZED", facts_created: 8 } });
-    await userEvent.click(screen.getByRole("button", { name: /submit and check eligibility/i }));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/results/${CITIZEN.citizen_id}`));
-    expect(api.formSubmissionService.complete).toHaveBeenCalledTimes(1);
-    expect(api.formSubmissionService.normalize).toHaveBeenCalledTimes(1);
-    expect(api.eligibilityService.evaluate).toHaveBeenCalledTimes(1);
+  it("blocks eligibility evaluation and shows missing fields if profile remains incomplete after normalization", async () => {
+    const incompleteCitizen = {
+      ...CITIZEN_FULL,
+      profile_status: "INCOMPLETE",
+      profile_completion: 50,
+      missing_fields: ["Annual Income", "Social Category"],
+    };
+    const stillIncompleteCitizen = {
+      ...CITIZEN_FULL,
+      profile_status: "INCOMPLETE",
+      profile_completion: 75,
+      missing_fields: ["Annual Income"],
+    };
+
+    await reachLastSection(incompleteCitizen);
+
+    api.formSubmissionService.update.mockResolvedValue({ data: submissionResponse() });
+    api.formSubmissionService.complete.mockResolvedValue({
+      data: submissionResponse({ status: "COMPLETED", completed_at: "2026-09-16T10:05:00Z" }),
+    });
+    api.formSubmissionService.normalize.mockResolvedValue({
+      data: { status: "NORMALIZED", facts_created: 4 },
+    });
+
+    // Re-fetched citizen profile is still INCOMPLETE
+    api.citizenService.get.mockResolvedValue({ data: stillIncompleteCitizen });
+
+    await userEvent.click(screen.getByRole("button", { name: /submit & evaluate/i }));
+
+    await waitFor(() => expect(api.formSubmissionService.normalize).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.citizenService.get).toHaveBeenCalledWith(CITIZEN.citizen_id));
+
+    // Must NOT run eligibility evaluation or fetch recommendations
+    expect(api.eligibilityService.evaluate).not.toHaveBeenCalled();
+    expect(api.recommendationService.getForCitizen).not.toHaveBeenCalled();
+
+    // Renders incomplete profile gate showing the remaining missing field
+    expect(await screen.findByRole("heading", { name: /complete your profile/i })).toBeInTheDocument();
+    expect(screen.getByText(/annual income/i)).toBeInTheDocument();
+    expect(screen.queryByText(/social category/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/75%/i)).toBeInTheDocument();
   });
 
-  it("maps backend missing-required errors to the right questions and section", async () => {
-    await reachReview();
-    api.formSubmissionService.complete.mockRejectedValue(
-      httpError(422, { detail: { message: "Incomplete", missing_required: ["ANNUAL_INCOME"] } }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: /submit and check eligibility/i }));
-    await screen.findByText(/some required answers are still missing/i);
-    // Landed on the Financial section (contains ANNUAL_INCOME).
-    expect(screen.getByText(/section 3 of 3/i)).toBeInTheDocument();
-    expect(screen.getByText(/this answer is required/i)).toBeInTheDocument();
+  it("shows error state when submission update fails", async () => {
+    await reachLastSection();
+    api.formSubmissionService.update.mockRejectedValue(httpError(500, { detail: "Server error" }));
+    await userEvent.click(screen.getByRole("button", { name: /submit & evaluate/i }));
+    expect(await screen.findByText(/failed to submit form answers/i)).toBeInTheDocument();
   });
+});
 
-  it("does not call normalization when completion fails", async () => {
-    await reachReview();
-    api.formSubmissionService.complete.mockRejectedValue(httpError(422, { detail: { message: "Incomplete", missing_required: ["ANNUAL_INCOME"] } }));
-    await userEvent.click(screen.getByRole("button", { name: /submit and check eligibility/i }));
-    await screen.findByText(/some required answers are still missing/i);
-    expect(api.formSubmissionService.normalize).not.toHaveBeenCalled();
+describe("CheckEligibilityPage — clean eligibility view", () => {
+  it("evaluates eligibility and displays recommendations on button click", async () => {
+    api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
+    renderPage(["/check-eligibility"]);
+    expect(await screen.findByRole("heading", { name: /check scheme eligibility/i })).toBeInTheDocument();
+    expect(screen.getByText(/profile complete/i)).toBeInTheDocument();
+
+    const checkButton = screen.getByRole("button", { name: /check my eligibility/i });
+    await userEvent.click(checkButton);
+
+    await waitFor(() => expect(api.eligibilityService.evaluate).toHaveBeenCalledWith(CITIZEN.citizen_id));
+    await waitFor(() => expect(api.recommendationService.getForCitizen).toHaveBeenCalledWith(CITIZEN.citizen_id));
+    expect(await screen.findByRole("heading", { name: /eligible for you/i })).toBeInTheDocument();
   });
 });

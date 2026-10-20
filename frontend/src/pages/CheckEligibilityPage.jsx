@@ -228,6 +228,7 @@ export default function CheckEligibilityPage() {
         const formRes = await formService.getActive(FORM_CODE);
         formDef = formRes.data;
       } catch (err) {
+        if (modeParam === "form") throw err;
         console.warn("Form definition load notice:", err);
       }
 
@@ -236,10 +237,10 @@ export default function CheckEligibilityPage() {
       setCitizen(resolvedCitizen);
       if (formDef) setForm(formDef);
 
-      if (resolvedCitizen.profile_status !== "COMPLETE") {
-        setPhase("incomplete-profile");
-      } else if (modeParam === "form") {
+      if (modeParam === "form") {
         setPhase("form");
+      } else if (resolvedCitizen.profile_status !== "COMPLETE") {
+        setPhase("incomplete-profile");
       } else {
         setPhase("ready");
       }
@@ -254,18 +255,35 @@ export default function CheckEligibilityPage() {
     };
   }, [loadKey, modeParam]);
 
-  // 2. Perform Scheme Eligibility Evaluation on user action
-  const runEligibilityCheck = useCallback(async () => {
-    if (!citizen?.citizen_id || citizen.profile_status !== "COMPLETE") return;
+  // 2. Perform Scheme Eligibility Evaluation on user action or after questionnaire normalization
+  const runEligibilityCheck = useCallback(async (activeCitizen = null) => {
+    let targetCitizen =
+      activeCitizen && typeof activeCitizen === "object" && activeCitizen.citizen_id && !activeCitizen.nativeEvent
+        ? activeCitizen
+        : null;
+    const cid = targetCitizen?.citizen_id || citizen?.citizen_id;
+    if (!cid || cid === "null" || cid === "undefined") return;
+
     setEvaluating(true);
     setMessage("");
 
     try {
+      if (!targetCitizen) {
+        const res = await citizenService.get(cid);
+        targetCitizen = res.data;
+        setCitizen(targetCitizen);
+      }
+
+      if (targetCitizen.profile_status !== "COMPLETE") {
+        setPhase("incomplete-profile");
+        return;
+      }
+
       // Step A: Evaluate schemes against bulk facts in PostgreSQL / Redis
-      await eligibilityService.evaluate(citizen.citizen_id);
+      await eligibilityService.evaluate(targetCitizen.citizen_id);
 
       // Step B: Fetch formatted recommendations & required documents
-      const recRes = await recommendationService.getForCitizen(citizen.citizen_id);
+      const recRes = await recommendationService.getForCitizen(targetCitizen.citizen_id);
       setResultsData(recRes.data);
       setPhase("results");
     } catch (err) {
@@ -364,9 +382,14 @@ export default function CheckEligibilityPage() {
         citizen_id: citizenId,
         answers: payload,
       });
-      await formSubmissionService.complete(submission.submission_id, { citizen_id: citizen.citizen_id });
-      await formSubmissionService.normalize(submission.submission_id, { citizen_id: citizen.citizen_id });
-      await runEligibilityCheck();
+      await formSubmissionService.complete(submission.submission_id, { citizen_id: citizenId });
+      await formSubmissionService.normalize(submission.submission_id, { citizen_id: citizenId });
+
+      // Authoritative refresh of the updated citizen after normalization writes canonical facts
+      const freshRes = await citizenService.get(citizenId);
+      const freshCitizen = freshRes.data;
+      setCitizen(freshCitizen);
+      await runEligibilityCheck(freshCitizen);
     } catch (err) {
       console.error(err);
       setPhase("form");
@@ -374,7 +397,7 @@ export default function CheckEligibilityPage() {
     } finally {
       setEvaluating(false);
     }
-  }, [citizen, submission, answers, runEligibilityCheck]);
+  }, [citizen, submission, form, runEligibilityCheck]);
 
   // ---------------------------------------------------------------------------
   // CONDITIONAL VIEW RENDERING AFTER ALL HOOKS
@@ -420,7 +443,7 @@ export default function CheckEligibilityPage() {
   }
 
   // 2. Incomplete Profile View (Profile Completeness Gate)
-  if (phase === "incomplete-profile" || (citizen && citizen.profile_status !== "COMPLETE")) {
+  if (phase === "incomplete-profile" || (citizen && citizen.profile_status !== "COMPLETE" && phase !== "form" && phase !== "results")) {
     const missing = citizen?.missing_fields?.length
       ? citizen.missing_fields
       : ["Education Details", "Annual Income", "Social Category", "State / Location"];
@@ -606,7 +629,7 @@ export default function CheckEligibilityPage() {
               <Button
                 variant="primary"
                 size="lg"
-                onClick={runEligibilityCheck}
+                onClick={() => runEligibilityCheck()}
                 disabled={evaluating}
                 className="shadow-sm font-semibold"
               >
@@ -650,7 +673,7 @@ export default function CheckEligibilityPage() {
       {/* Error Message */}
       {message && (
         <div>
-          <ErrorState title="Evaluation Error" message={message} onRetry={runEligibilityCheck} />
+          <ErrorState title="Evaluation Error" message={message} onRetry={() => runEligibilityCheck()} />
         </div>
       )}
 

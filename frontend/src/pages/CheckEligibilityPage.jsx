@@ -96,13 +96,15 @@ function SchemeDocuments({ item }) {
       <ul className="space-y-2 mb-3">
         {item.scheme_documents.map((d) => {
           const isValid = d.status === "VALID";
-          const isRejected = d.status === "REJECTED";
+          const isInvalid = d.status === "INVALID" || d.status === "REJECTED";
+          const isReviewRequired = d.status === "REVIEW_REQUIRED";
+          const isMissing = d.status === "MISSING";
           return (
             <li key={d.document_type} className="text-xs flex items-center justify-between gap-2 p-1.5 rounded bg-surface/50 border border-line/60">
               <div className="flex items-center gap-2">
                 {isValid ? (
                   <CheckCircle2 className="h-3.5 w-3.5 text-ok shrink-0" />
-                ) : isRejected ? (
+                ) : isInvalid ? (
                   <XCircle className="h-3.5 w-3.5 text-excl shrink-0" />
                 ) : (
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
@@ -114,11 +116,19 @@ function SchemeDocuments({ item }) {
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
                 isValid
                   ? "bg-ok-soft/30 text-ok-ink border-ok-soft"
-                  : isRejected
+                  : isInvalid
                   ? "bg-excl-soft/30 text-excl-ink border-excl-soft"
                   : "bg-amber-500/15 text-amber-700 border-amber-300"
               }`}>
-                {isValid ? "✓ Verified" : isRejected ? "✕ Rejected" : "⚠ Pending"}
+                {isValid
+                  ? "✓ Verified"
+                  : isInvalid
+                  ? "✕ Invalid"
+                  : isReviewRequired
+                  ? "⚠ Review Required"
+                  : isMissing
+                  ? "⚠ Missing"
+                  : "⚠ Pending"}
               </span>
             </li>
           );

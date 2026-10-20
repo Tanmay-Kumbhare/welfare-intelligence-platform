@@ -256,6 +256,31 @@ export const recommendationService = {
   getForCitizen: (citizenId) => api.get(`/recommendations/${citizenId}`),
 };
 
+export const documentService = {
+  getRequirements: (citizenId) => {
+    if (!citizenId || citizenId === "null" || citizenId === "undefined") {
+      return Promise.reject(new Error("Citizen ID is required to get document requirements"));
+    }
+    return api.get(`/documents/requirements/${citizenId}`);
+  },
+  upload: async (citizenId, data) => {
+    if (!citizenId || citizenId === "null" || citizenId === "undefined") {
+      return Promise.reject(new Error("Citizen ID is required to upload a document"));
+    }
+    const res = await api.post(`/documents/upload/${citizenId}`, data);
+    invalidateClientCache(`/citizens/${citizenId}`);
+    return res;
+  },
+  delete: async (citizenId, documentId) => {
+    if (!citizenId || !documentId) {
+      return Promise.reject(new Error("Citizen ID and Document ID are required to delete a document"));
+    }
+    const res = await api.delete(`/documents/${citizenId}/${documentId}`);
+    invalidateClientCache(`/citizens/${citizenId}`);
+    return res;
+  },
+};
+
 // Phase 2C: database-driven dynamic form
 export const formService = {
   getActive: (formCode) => cachedGet(api, `/forms/${formCode}`),

@@ -366,13 +366,12 @@ class DocumentService:
         detected = DocumentClassifier.classify_document(filename, content_base64)
         status, message = DocumentClassifier.validate_type(detected, requirement_type)
 
-        # Delete existing if replacing
+        # Delete all existing records if replacing
         existing = await self.db.execute(
             select(CitizenDocument)
             .where(CitizenDocument.citizen_id == citizen_id, CitizenDocument.requirement_type == requirement_type)
         )
-        existing_doc = existing.scalars().first()
-        if existing_doc:
+        for existing_doc in existing.scalars().all():
             await self.db.delete(existing_doc)
 
         new_doc = CitizenDocument(

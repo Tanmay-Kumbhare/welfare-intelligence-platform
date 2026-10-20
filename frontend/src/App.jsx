@@ -52,6 +52,7 @@ function App() {
 
             <Route element={<AuthLayout />}>
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/documents" element={<DocumentsPage />} />
               <Route element={<ProfileCompletionGate />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/schemes" element={<SchemesPage />} />
@@ -64,7 +65,6 @@ function App() {
             </Route>
 
             <Route path="/check-eligibility" element={<CheckEligibilityPage />} />
-            <Route path="/documents" element={<DocumentsPage />} />
           </Route>
 
           {/* Admin area: completely separate shell */}

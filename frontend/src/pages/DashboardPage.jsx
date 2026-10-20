@@ -6,8 +6,7 @@ import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
 import ProfileAuditAlert from "../components/dashboard/ProfileAuditAlert";
 import { LoadingState, ErrorState } from "../components/ui/StatusStates";
-import { authService, citizenService, recommendationService } from "../services/api";
-import api from "../services/api";
+import { authService, citizenService, documentService, recommendationService } from "../services/api";
 
 export default function DashboardPage() {
   const [data, setData] = useState({
@@ -33,7 +32,7 @@ export default function DashboardPage() {
         const [citRes, recRes, reqRes] = await Promise.allSettled([
           citizenService.get(citizenId),
           recommendationService.getForCitizen(citizenId),
-          api.get(`/documents/requirements/${citizenId}`)
+          documentService.getRequirements(citizenId)
         ]);
 
         if (cancelled) return;

@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react";
-import { UploadCloud, CheckCircle, XCircle, Clock } from "lucide-react";
+import { UploadCloud, CheckCircle, XCircle, Clock, Trash2 } from "lucide-react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import { LoadingState, ErrorState } from "../components/ui/StatusStates";
-import { authService, citizenService } from "../services/api";
+import { authService, citizenService, documentService } from "../services/api";
 import { getStoredCitizenId, clearStoredCitizenId } from "../utils/citizenStorage";
-import axios from "axios"; // Using standard axios or we can use our api singleton
-import api from "../services/api";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 const fileToBase64 = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -21,34 +17,60 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
 function DocumentUploadCard({ requirement, citizenId, onUploadComplete }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  const [uploadSuccess, setUploadSuccess] = useState(null);
   const doc = requirement.document;
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
       setError(null);
+      setUploadSuccess(null);
     }
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || uploading || deleting) return;
     setUploading(true);
     setError(null);
+    setUploadSuccess(null);
     try {
       const base64 = await fileToBase64(file);
-      await api.post(`/documents/upload/${citizenId}`, {
+      await documentService.upload(citizenId, {
         requirement_type: requirement.type,
         filename: file.name,
         content_type: file.type || "application/octet-stream",
-        content_base64: base64
+        content_base64: base64,
       });
+      setFile(null);
+      setUploadSuccess("Document uploaded successfully.");
+      onUploadComplete();
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Upload failed. Please check the file and try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!doc?.document_id || deleting || uploading) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete your uploaded ${requirement.name}?`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError(null);
+    setUploadSuccess(null);
+    try {
+      await documentService.delete(citizenId, doc.document_id);
       setFile(null);
       onUploadComplete();
     } catch (err) {
-      setError(err?.response?.data?.detail || "Upload failed");
+      setError(err?.response?.data?.detail || "Failed to delete document.");
     } finally {
-      setUploading(false);
+      setDeleting(false);
     }
   };
 
@@ -103,14 +125,28 @@ function DocumentUploadCard({ requirement, citizenId, onUploadComplete }) {
           <input 
             type="file" 
             id={`file-${requirement.type}`} 
-            className="text-sm text-ink-soft file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-surface file:text-ink hover:file:bg-line cursor-pointer"
+            aria-label={`Upload ${requirement.name}`}
+            className="text-sm text-ink-soft file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-surface file:text-ink hover:file:bg-line cursor-pointer disabled:opacity-50"
             onChange={handleFileChange}
+            disabled={uploading || deleting}
           />
           {file && (
-            <Button onClick={handleUpload} disabled={uploading}>
+            <Button onClick={handleUpload} disabled={uploading || deleting}>
               {uploading ? "Uploading..." : doc ? "Replace Document" : "Upload Document"}
             </Button>
           )}
+          {doc && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDelete}
+              disabled={uploading || deleting}
+              className="mt-1"
+            >
+              {deleting ? "Deleting..." : "Delete Document"}
+            </Button>
+          )}
+          {uploadSuccess && <p className="text-xs text-ok-ink mt-1 font-medium">{uploadSuccess}</p>}
           {error && <p className="text-xs text-excl-ink mt-1">{error}</p>}
         </div>
       </div>
@@ -126,7 +162,7 @@ export default function DocumentsPage() {
 
   const fetchRequirements = async (citizenId) => {
     try {
-      const response = await api.get(`/documents/requirements/${citizenId}`);
+      const response = await documentService.getRequirements(citizenId);
       setRequirements(response.data);
     } catch (err) {
       setError("Unable to load document requirements.");

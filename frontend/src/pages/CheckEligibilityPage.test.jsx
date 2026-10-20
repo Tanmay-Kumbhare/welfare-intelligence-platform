@@ -202,7 +202,9 @@ describe("CheckEligibilityPage — wizard navigation and draft answers", () => {
       }),
     });
     renderPage();
-    expect(await screen.findByLabelText(/marital status/i)).toHaveValue("MARRIED");
+    await waitFor(() => {
+      expect(screen.getByLabelText(/marital status/i)).toHaveValue("MARRIED");
+    });
   });
 
   it("hides conditional questions in response to answers", async () => {
@@ -333,5 +335,44 @@ describe("CheckEligibilityPage — clean eligibility view", () => {
     await waitFor(() => expect(api.eligibilityService.evaluate).toHaveBeenCalledWith(CITIZEN.citizen_id));
     await waitFor(() => expect(api.recommendationService.getForCitizen).toHaveBeenCalledWith(CITIZEN.citizen_id));
     expect(await screen.findByRole("heading", { name: /eligible for you/i })).toBeInTheDocument();
+  });
+});
+
+describe("CheckEligibilityPage — document status feedback", () => {
+  it("renders distinct badges and icons for valid, invalid, review required, and missing documents", async () => {
+    api.citizenService.get.mockResolvedValue({ data: CITIZEN_FULL });
+    api.recommendationService.getForCitizen.mockResolvedValue({
+      data: {
+        eligible_schemes: [
+          {
+            scheme: {
+              scheme_id: "sch-0001",
+              scheme_name: "Post Matric Scholarship",
+              department_name: "Higher Education",
+              status: "ACTIVE",
+              benefit_description: "Financial assistance.",
+            },
+            match_score: 95,
+            document_status: "ACTION_REQUIRED",
+            scheme_documents: [
+              { document_type: "AADHAAR_CARD", status: "VALID" },
+              { document_type: "INCOME_CERTIFICATE", status: "INVALID" },
+              { document_type: "CASTE_CERTIFICATE", status: "REVIEW_REQUIRED" },
+              { document_type: "DOMICILE_CERTIFICATE", status: "MISSING" },
+            ],
+          },
+        ],
+        ineligible_schemes: [],
+      },
+    });
+
+    renderPage(["/check-eligibility"]);
+    const checkButton = await screen.findByRole("button", { name: /check my eligibility/i });
+    await userEvent.click(checkButton);
+
+    expect(await screen.findByText("✓ Verified")).toBeInTheDocument();
+    expect(await screen.findByText("✕ Invalid")).toBeInTheDocument();
+    expect(await screen.findByText("⚠ Review Required")).toBeInTheDocument();
+    expect(await screen.findByText("⚠ Missing")).toBeInTheDocument();
   });
 });

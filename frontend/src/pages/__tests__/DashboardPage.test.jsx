@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import DashboardPage from '../DashboardPage';
-import { authService, citizenService, recommendationService } from '../../services/api';
+import { authService, citizenService, recommendationService, documentService } from '../../services/api';
 import api from '../../services/api';
 
 // Mock dependencies
@@ -16,6 +16,9 @@ vi.mock('../../services/api', () => ({
   },
   recommendationService: {
     getForCitizen: vi.fn(),
+  },
+  documentService: {
+    getRequirements: vi.fn(),
   },
   __esModule: true,
   default: {
@@ -100,7 +103,7 @@ describe('DashboardPage', () => {
       }
     });
 
-    api.get.mockResolvedValue({
+    documentService.getRequirements.mockResolvedValue({
       data: {
         STUDENT: [
           { type: '10TH_MARKSHEET', name: '10th Marksheet', required: true, document: { validation_status: 'VALID' } },

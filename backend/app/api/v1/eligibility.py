@@ -55,6 +55,7 @@ async def evaluate_citizen_eligibility(
                 "profile_status": profile_status,
                 "profile_completion": profile_completion,
                 "missing_fields": missing_fields,
+                "missing_field_labels": missing_fields,
             },
         )
 

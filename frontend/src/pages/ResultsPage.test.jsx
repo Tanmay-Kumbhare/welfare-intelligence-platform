@@ -402,4 +402,125 @@ describe("ResultsPage Task 2 integration", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("handles HTTP 422 incomplete profile by displaying incomplete profile banner with missing field labels", async () => {
+    const citizenId = "cit-inc-1";
+    api.citizenService.get.mockResolvedValue({
+      data: { citizen_id: citizenId, full_name: "Incomplete Citizen" },
+    });
+    api.eligibilityService.evaluate.mockRejectedValue({
+      response: {
+        status: 422,
+        data: {
+          detail: {
+            message: "Profile is incomplete for eligibility evaluation. Please complete required profile fields.",
+            profile_status: "INCOMPLETE",
+            profile_completion: 40,
+            missing_field_labels: ["Annual Income", "Social Category", "State / Location"],
+          },
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/results/${citizenId}`]}>
+        <Routes>
+          <Route path="/results/:citizenId" element={<ResultsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Profile Incomplete")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Evaluation Paused: Missing Information/i)).toBeInTheDocument();
+    expect(screen.getByText("Annual Income")).toBeInTheDocument();
+    expect(screen.getByText("Social Category")).toBeInTheDocument();
+    expect(screen.getByText("State / Location")).toBeInTheDocument();
+    expect(screen.getByText("40%")).toBeInTheDocument();
+
+    // Verify navigation links
+    const questionnaireBtn = screen.getByRole("link", { name: /Complete Profile Questionnaire/i });
+    expect(questionnaireBtn).toHaveAttribute("href", "/check-eligibility");
+
+    const profileBtn = screen.getByRole("link", { name: /View Profile Details/i });
+    expect(profileBtn).toHaveAttribute("href", "/profile");
+
+    // Must NOT fall through to EmptyState
+    expect(screen.queryByText(/No evaluated schemes currently match/i)).not.toBeInTheDocument();
+  });
+
+  it("handles HTTP 422 with missing_fields fallback if missing_field_labels is absent", async () => {
+    const citizenId = "cit-inc-2";
+    api.citizenService.get.mockResolvedValue({
+      data: { citizen_id: citizenId, full_name: "Incomplete Citizen 2" },
+    });
+    api.eligibilityService.evaluate.mockRejectedValue({
+      response: {
+        status: 422,
+        data: {
+          detail: {
+            message: "Profile is incomplete for eligibility evaluation.",
+            missing_fields: ["Date of Birth", "Gender"],
+          },
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/results/${citizenId}`]}>
+        <Routes>
+          <Route path="/results/:citizenId" element={<ResultsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Profile Incomplete")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Date of Birth")).toBeInTheDocument();
+    expect(screen.getByText("Gender")).toBeInTheDocument();
+    expect(screen.queryByText(/No evaluated schemes currently match/i)).not.toBeInTheDocument();
+  });
+
+  it("preserves fallback to stored recommendations on non-404, non-422 evaluation failure", async () => {
+    const citizenId = "cit-tol-1";
+    api.citizenService.get.mockResolvedValue({
+      data: { citizen_id: citizenId, full_name: "Tolerant Citizen" },
+    });
+    api.eligibilityService.evaluate.mockRejectedValue({
+      response: { status: 500, data: { detail: "Internal Server Error" } },
+    });
+    api.recommendationService.getForCitizen.mockResolvedValue({
+      data: {
+        citizen_id: citizenId,
+        eligible_schemes: [
+          {
+            scheme: {
+              scheme_id: "sch-stored",
+              scheme_name: "Previously Stored Scheme",
+              status: "ACTIVE",
+            },
+            eligibility_result: true,
+            rule_match_score: 95.0,
+          },
+        ],
+        ineligible_schemes: [],
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/results/${citizenId}`]}>
+        <Routes>
+          <Route path="/results/:citizenId" element={<ResultsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Previously Stored Scheme")).toBeInTheDocument();
+    });
+  });
 });

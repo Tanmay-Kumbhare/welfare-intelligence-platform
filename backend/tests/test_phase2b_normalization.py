@@ -22,9 +22,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.api.v1.deps import get_authenticated_user
 from app.config import get_settings
 from app.database import engine
 from app.main import app
+from app.models.auth import UserAccount, UserRole
 from app.models.form import (
     FormCondition,
     FormDefinition,
@@ -270,8 +272,14 @@ def _conditional_norm_spec() -> dict:
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(app) as c:
-        yield c
+    admin_user = UserAccount(user_id=uuid.uuid4(), email="test_admin@example.com")
+    admin_user.roles = [UserRole(role="ADMIN")]
+    app.dependency_overrides[get_authenticated_user] = lambda: admin_user
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.dependency_overrides.pop(get_authenticated_user, None)
     _run(engine.dispose())
 
 

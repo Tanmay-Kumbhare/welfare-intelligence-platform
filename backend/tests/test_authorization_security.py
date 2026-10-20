@@ -163,6 +163,42 @@ async def test_unauthenticated_requests_return_401(db: AsyncSession):
             # 13. Document Delete
             r = await client.delete(f"/api/v1/documents/{citizen_id}/{dummy_id}")
             assert r.status_code == 401
+
+            # 14. Form Submission Create
+            r = await client.post(
+                "/api/v1/forms/GENERAL_CITIZEN_PROFILE/submissions",
+                json={"citizen_id": citizen_id, "answers": []},
+            )
+            assert r.status_code == 401
+            assert "www-authenticate" in r.headers
+
+            # 15. Form Submission Read
+            r = await client.get(
+                f"/api/v1/forms/submissions/{dummy_id}",
+                params={"citizen_id": citizen_id},
+            )
+            assert r.status_code == 401
+
+            # 16. Form Submission Update
+            r = await client.put(
+                f"/api/v1/forms/submissions/{dummy_id}",
+                json={"citizen_id": citizen_id, "answers": []},
+            )
+            assert r.status_code == 401
+
+            # 17. Form Submission Complete
+            r = await client.post(
+                f"/api/v1/forms/submissions/{dummy_id}/complete",
+                json={"citizen_id": citizen_id},
+            )
+            assert r.status_code == 401
+
+            # 18. Form Submission Normalize
+            r = await client.post(
+                f"/api/v1/forms/submissions/{dummy_id}/normalize",
+                json={"citizen_id": citizen_id},
+            )
+            assert r.status_code == 401
     finally:
         app.dependency_overrides.clear()
 
@@ -256,6 +292,51 @@ async def test_cross_citizen_access_forbidden(db: AsyncSession):
             # 11. Delete document of another citizen
             r = await client.delete(f"/api/v1/documents/{citizen_b_id}/{dummy_id}", headers=headers_a)
             assert r.status_code == 403
+
+            # 12. Create submission for another citizen
+            r = await client.post(
+                "/api/v1/forms/GENERAL_CITIZEN_PROFILE/submissions",
+                headers=headers_a,
+                json={"citizen_id": citizen_b_id, "answers": []},
+            )
+            assert r.status_code == 403
+            assert r.json()["detail"] == "You can only access your own citizen profile"
+
+            # 13. Read submission of another citizen
+            r = await client.get(
+                f"/api/v1/forms/submissions/{dummy_id}",
+                headers=headers_a,
+                params={"citizen_id": citizen_b_id},
+            )
+            assert r.status_code == 403
+            assert r.json()["detail"] == "You can only access your own citizen profile"
+
+            # 14. Update submission of another citizen
+            r = await client.put(
+                f"/api/v1/forms/submissions/{dummy_id}",
+                headers=headers_a,
+                json={"citizen_id": citizen_b_id, "answers": []},
+            )
+            assert r.status_code == 403
+            assert r.json()["detail"] == "You can only access your own citizen profile"
+
+            # 15. Complete submission of another citizen
+            r = await client.post(
+                f"/api/v1/forms/submissions/{dummy_id}/complete",
+                headers=headers_a,
+                json={"citizen_id": citizen_b_id},
+            )
+            assert r.status_code == 403
+            assert r.json()["detail"] == "You can only access your own citizen profile"
+
+            # 16. Normalize submission of another citizen
+            r = await client.post(
+                f"/api/v1/forms/submissions/{dummy_id}/normalize",
+                headers=headers_a,
+                json={"citizen_id": citizen_b_id},
+            )
+            assert r.status_code == 403
+            assert r.json()["detail"] == "You can only access your own citizen profile"
     finally:
         app.dependency_overrides.clear()
 
@@ -342,6 +423,32 @@ async def test_authorized_own_citizen_access_allowed(db: AsyncSession):
                 json={"overrides": {"annual_income": 150000}},
             )
             assert r.status_code == 200
+
+            # 9. Create own submission
+            r = await client.post(
+                "/api/v1/forms/GENERAL_CITIZEN_PROFILE/submissions",
+                headers=headers,
+                json={"citizen_id": citizen_id, "answers": []},
+            )
+            assert r.status_code == 201
+            sub_id = r.json()["submission_id"]
+
+            # 10. Read own submission
+            r = await client.get(
+                f"/api/v1/forms/submissions/{sub_id}",
+                headers=headers,
+                params={"citizen_id": citizen_id},
+            )
+            assert r.status_code == 200
+            assert r.json()["submission_id"] == sub_id
+
+            # 11. Update own submission
+            r = await client.put(
+                f"/api/v1/forms/submissions/{sub_id}",
+                headers=headers,
+                json={"citizen_id": citizen_id, "answers": []},
+            )
+            assert r.status_code == 200
     finally:
         app.dependency_overrides.clear()
 
@@ -374,6 +481,24 @@ async def test_admin_user_can_access_any_citizen(db: AsyncSession):
                 headers=admin_info["headers"],
             )
             assert r.status_code == 200
+
+            # Admin can create submission for target citizen
+            r = await client.post(
+                "/api/v1/forms/GENERAL_CITIZEN_PROFILE/submissions",
+                headers=admin_info["headers"],
+                json={"citizen_id": target_citizen_id, "answers": []},
+            )
+            assert r.status_code == 201
+            target_sub_id = r.json()["submission_id"]
+
+            # Admin can read target citizen's submission
+            r = await client.get(
+                f"/api/v1/forms/submissions/{target_sub_id}",
+                headers=admin_info["headers"],
+                params={"citizen_id": target_citizen_id},
+            )
+            assert r.status_code == 200
+            assert r.json()["submission_id"] == target_sub_id
     finally:
         app.dependency_overrides.clear()
 

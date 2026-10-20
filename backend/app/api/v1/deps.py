@@ -67,20 +67,15 @@ async def require_same_citizen(
     user: UserAccount | None,
     citizen_id: uuid.UUID,
     db: AsyncSession,
-    *,
-    allow_anonymous: bool = False,
 ) -> None:
     """Ownership guard for citizen-scoped endpoints.
 
-    When the request is unauthenticated (user is None) and allow_anonymous is False,
-    401 Unauthorized is raised.
+    When the request is unauthenticated (user is None), 401 Unauthorized is raised.
     When the request is authenticated, the citizen_id must belong to the
     authenticated user — otherwise 403 Forbidden is raised.
     ADMINs bypass.
     """
     if user is None:
-        if allow_anonymous:
-            return
         raise HTTPException(
             status_code=401,
             detail="Not authenticated",

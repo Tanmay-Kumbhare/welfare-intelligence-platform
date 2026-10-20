@@ -32,8 +32,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.api.v1.deps import get_authenticated_user
 from app.config import get_settings
 from app.main import app
+from app.models.auth import UserAccount, UserRole
 
 _TestSession = async_sessionmaker(
     create_async_engine(get_settings().DATABASE_URL, poolclass=NullPool),
@@ -51,8 +53,14 @@ def _run(coro):
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(app) as c:
-        yield c
+    admin_user = UserAccount(user_id=uuid.uuid4(), email="test_admin@example.com")
+    admin_user.roles = [UserRole(role="ADMIN")]
+    app.dependency_overrides[get_authenticated_user] = lambda: admin_user
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.dependency_overrides.pop(get_authenticated_user, None)
 
 
 @pytest.fixture(scope="module")
@@ -87,10 +95,20 @@ def _register(client, tracked, **overrides) -> dict:
         "date_of_birth": "2001-03-15",
         "gender": "FEMALE",
         "citizen_type": "GENERAL",
-        "demographic": {"disability_status": "NONE"},
+        "demographic": {
+            "disability_status": "NONE",
+            "social_category": "GENERAL",
+            "education_level": "GRADUATE",
+        },
         "financial": {"is_bpl_card_holder": False, "is_income_tax_payer": False},
         "location": {},
     }
+    if "demographic" in overrides:
+        payload["demographic"].update(overrides.pop("demographic"))
+    if "financial" in overrides:
+        payload["financial"].update(overrides.pop("financial"))
+    if "location" in overrides:
+        payload["location"].update(overrides.pop("location"))
     payload.update(overrides)
     resp = client.post("/api/v1/citizens/", json=payload)
     assert resp.status_code == 201, resp.text

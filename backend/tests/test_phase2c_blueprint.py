@@ -23,8 +23,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.api.v1.deps import get_authenticated_user
 from app.config import get_settings
 from app.main import app
+from app.models.auth import UserAccount, UserRole
 from scripts.seed_forms import validate_form_spec, validate_seed_file
 
 _TestSession = async_sessionmaker(
@@ -290,8 +292,14 @@ class TestSeedValidation:
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(app) as c:
-        yield c
+    admin_user = UserAccount(user_id=uuid.uuid4(), email="test_admin@example.com")
+    admin_user.roles = [UserRole(role="ADMIN")]
+    app.dependency_overrides[get_authenticated_user] = lambda: admin_user
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.dependency_overrides.pop(get_authenticated_user, None)
 
 
 @pytest.fixture(scope="module")
@@ -535,7 +543,7 @@ class TestV3SubmissionLifecycle:
         # v3 asks no identity questions: DATE_OF_BIRTH must come from the
         # registration record (2000-06-15 in _make_citizen), not the form.
         assert facts["DATE_OF_BIRTH"] == "2000-06-15"
-        assert facts["FULL_NAME"].startswith("Phase 2C Test")
+        assert facts["FULL_NAME"].startswith("PhaseTwoCee Test")
         assert facts["IS_BPL_CARD_HOLDER"] == "TRUE"        # derived from BPL
         assert facts["POVERTY_CATEGORY"] == "BPL"
         assert facts["RELIGION"] == "SIKH"

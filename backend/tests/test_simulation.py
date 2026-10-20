@@ -3,10 +3,11 @@ from datetime import date
 import pytest
 
 from app.models.citizen import CitizenMaster, FinancialProfile, DemographicProfile, LocationProfile
+from app.models.profile_fact import ProfileFact
 from app.models.scheme import SchemeMaster, SchemeRuleGroup, SchemeEligibilityRule
 from app.schemas.simulation import SimulationInput
 from app.services.eligibility_engine import EligibilityEngine
-from app.services.simulation_service import SimulationService
+from app.services.simulation_service import SimulationService, SimulationEligibilityEngine
 
 
 def _create_test_scheme_kisan() -> SchemeMaster:
@@ -323,4 +324,129 @@ def test_condition_delta_handles_duplicate_parameter_and_description_rules():
     assert delta1.simulated_passed is True
     assert delta1.baseline_value == 50000.0
     assert delta1.simulated_value == 200000.0
+
+
+def test_simulation_with_facts_dict_preserves_non_overridden_facts():
+    """
+    Simulating with facts_dict ensures non-overridden parameters resolve from
+    authoritative profile facts, while overrides take effect as expected.
+    """
+    citizen = CitizenMaster(
+        citizen_id=uuid.uuid4(),
+        citizen_type="STUDENT",
+        date_of_birth=date(2000, 1, 1),
+    )
+    # Profile facts: student has high income (fails) and tenth_percentage (passes)
+    facts_dict = {
+        "ANNUAL_INCOME": "400000",
+        "TENTH_PERCENTAGE": "85.0",
+        "AGE": "24",
+    }
+    scheme = _create_test_scheme_scholarship()
+
+    # Simulate hypothetical income of 180000 (qualifies)
+    sim_input = SimulationInput(annual_income=180000.0)
+    resp = SimulationService.simulate_citizen_eligibility(
+        citizen=citizen,
+        schemes=[scheme],
+        simulation_input=sim_input,
+        facts_dict=facts_dict,
+    )
+
+    res = resp.simulated_schemes[0]
+    # Baseline failed because annual_income was 400000 from facts_dict
+    assert res.baseline_eligible is False
+    # Simulation succeeded because income override (180000) applied and tenth_percentage (85.0) resolved from facts_dict
+    assert res.simulated_eligible is True
+    assert res.outcome_change == "BECAME_ELIGIBLE"
+
+    income_delta = next(c for c in res.changed_conditions if c.parameter == "annual_income")
+    assert income_delta.baseline_value == 400000.0
+    assert income_delta.simulated_value == 180000.0
+    assert income_delta.status == "IMPROVED"
+
+
+def test_simulation_override_takes_precedence_over_stored_facts():
+    """Explicit hypothetical override strictly takes precedence over facts_dict."""
+    citizen = CitizenMaster(
+        citizen_id=uuid.uuid4(),
+        citizen_type="GENERAL",
+        date_of_birth=date(1980, 1, 1),
+    )
+    facts_dict = {
+        "ANNUAL_INCOME": "500000",
+        "AGE": "45",
+        "LAND_HOLDING_SIZE": "5.0",
+    }
+    engine = SimulationEligibilityEngine(
+        overrides={"annual_income": 120000.0, "age": 22},
+        facts_dict=facts_dict,
+    )
+
+    # Overridden parameters return override value
+    assert engine._resolve_parameter(citizen, "annual_income", facts_dict=facts_dict) == 120000.0
+    assert engine._resolve_parameter(citizen, "age", facts_dict=facts_dict) == 22
+
+    # Non-overridden parameter resolves from facts_dict
+    assert engine._resolve_parameter(citizen, "land_holding_size", facts_dict=facts_dict) == 5.0
+
+
+def test_simulation_engine_resolve_parameter_signature_no_type_error():
+    """
+    SimulationEligibilityEngine._resolve_parameter accepts facts_dict keyword argument
+    directly without raising TypeError.
+    """
+    citizen = CitizenMaster(citizen_id=uuid.uuid4())
+    facts = {"AGE": "28"}
+    engine = SimulationEligibilityEngine(overrides={}, facts_dict=facts)
+
+    # Calling with facts_dict kwarg must succeed
+    val = engine._resolve_parameter(citizen, "age", facts_dict=facts)
+    assert val == 28
+
+    # Calling without facts_dict kwarg must fall back to engine.facts_dict
+    val_default = engine._resolve_parameter(citizen, "age")
+    assert val_default == 28
+
+
+def test_simulation_fallback_to_citizen_profile_facts_if_facts_dict_omitted():
+    """
+    When facts_dict is omitted, SimulationService extracts active facts from
+    citizen.profile_facts if loaded on the instance.
+    """
+    citizen = CitizenMaster(
+        citizen_id=uuid.uuid4(),
+        citizen_type="STUDENT",
+        date_of_birth=date(2002, 5, 20),
+    )
+    citizen.profile_facts = [
+        ProfileFact(
+            fact_id=uuid.uuid4(),
+            citizen_id=citizen.citizen_id,
+            fact_code="TENTH_PERCENTAGE",
+            fact_value="88.0",
+            effective_until=None,
+        ),
+        ProfileFact(
+            fact_id=uuid.uuid4(),
+            citizen_id=citizen.citizen_id,
+            fact_code="ANNUAL_INCOME",
+            fact_value="500000",
+            effective_until=None,
+        ),
+    ]
+    scheme = _create_test_scheme_scholarship()
+
+    sim_input = SimulationInput(annual_income=200000.0)
+    resp = SimulationService.simulate_citizen_eligibility(
+        citizen=citizen,
+        schemes=[scheme],
+        simulation_input=sim_input,
+        # facts_dict omitted
+    )
+
+    res = resp.simulated_schemes[0]
+    assert res.baseline_eligible is False
+    assert res.simulated_eligible is True
+    assert res.outcome_change == "BECAME_ELIGIBLE"
 

@@ -104,6 +104,8 @@ async def simulate_citizen_eligibility(
     if not citizen:
         raise HTTPException(status_code=404, detail="Citizen not found")
 
+    profile_repo = ProfileRepository(db)
+    facts_dict = await profile_repo.load_all_active_facts(citizen_id)
     schemes = await scheme_repo.get_all_active_for_evaluation()
 
     from app.services.simulation_service import SimulationService
@@ -111,4 +113,5 @@ async def simulate_citizen_eligibility(
         citizen=citizen,
         schemes=schemes,
         simulation_input=payload,
+        facts_dict=facts_dict,
     )

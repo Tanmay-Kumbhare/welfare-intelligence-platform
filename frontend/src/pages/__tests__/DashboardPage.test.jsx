@@ -89,6 +89,7 @@ describe('DashboardPage', () => {
         citizen_id: citizenId,
         full_name: 'Test Citizen',
         profile_types: ['STUDENT', 'FARMER'],
+        profile_status: 'COMPLETE',
       }
     });
 
@@ -141,6 +142,75 @@ describe('DashboardPage', () => {
       expect(screen.getByText(/Documents Complete/i)).toBeInTheDocument();
       expect(screen.getByText(/Scholarship 2/i)).toBeInTheDocument();
       expect(screen.getByText(/Documents Pending/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders Profile Incomplete when profile_status is INCOMPLETE even with profile_types', async () => {
+    const citizenId = 'cit-456';
+    authService.me.mockResolvedValue({ data: { citizen_id: citizenId } });
+    citizenService.get.mockResolvedValue({
+      data: {
+        citizen_id: citizenId,
+        full_name: 'Incomplete Citizen',
+        profile_types: ['STUDENT'],
+        profile_status: 'INCOMPLETE',
+      }
+    });
+    recommendationService.getForCitizen.mockResolvedValue({ data: null });
+    documentService.getRequirements.mockResolvedValue({ data: {} });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Welcome back, Incomplete Citizen/i)).toBeInTheDocument();
+      expect(screen.getByText(/Profile Incomplete/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Profile Complete/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders Profile Complete when profile_status is COMPLETE', async () => {
+    const citizenId = 'cit-789';
+    authService.me.mockResolvedValue({ data: { citizen_id: citizenId } });
+    citizenService.get.mockResolvedValue({
+      data: {
+        citizen_id: citizenId,
+        full_name: 'Complete Citizen',
+        profile_types: ['FARMER'],
+        profile_status: 'COMPLETE',
+      }
+    });
+    recommendationService.getForCitizen.mockResolvedValue({ data: null });
+    documentService.getRequirements.mockResolvedValue({ data: {} });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Welcome back, Complete Citizen/i)).toBeInTheDocument();
+      expect(screen.getByText(/Profile Complete/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Profile Incomplete/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('does not imply completion when profile_types is non-empty but profile_status is missing/unknown', async () => {
+    const citizenId = 'cit-000';
+    authService.me.mockResolvedValue({ data: { citizen_id: citizenId } });
+    citizenService.get.mockResolvedValue({
+      data: {
+        citizen_id: citizenId,
+        full_name: 'Unknown Status Citizen',
+        profile_types: ['GENERAL'],
+        // profile_status is undefined / missing
+      }
+    });
+    recommendationService.getForCitizen.mockResolvedValue({ data: null });
+    documentService.getRequirements.mockResolvedValue({ data: {} });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Welcome back, Unknown Status Citizen/i)).toBeInTheDocument();
+      expect(screen.getByText(/Profile Incomplete/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Profile Complete/i)).not.toBeInTheDocument();
     });
   });
 });

@@ -78,7 +78,7 @@ export default function DashboardPage() {
 
   const { citizen, recommendations, requirements } = data;
   
-  const isProfileComplete = citizen?.profile_types && citizen.profile_types.length > 0;
+  const isProfileComplete = citizen?.profile_status === "COMPLETE";
   
   // Doc stats
   let reqDocs = 0, validDocs = 0, invalidDocs = 0, reviewDocs = 0, notUploaded = 0;

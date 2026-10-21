@@ -96,4 +96,7 @@ def test_missing_facts_do_not_silently_pass_rules():
     assert result is False
     assert details["passed_rules"] == 0
     assert details["match_score"] == 0
-    assert len(details["failed_rules"]) == 2
+    assert details["eligibility_status"] == "INSUFFICIENT_INFORMATION"
+    assert len(details["unknown_rules"]) == 2
+    assert len(details["failed_rules"]) == 0
+    assert details["missing_critical_facts"] == ["annual_income", "social_category"]

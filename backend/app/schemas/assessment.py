@@ -56,6 +56,9 @@ class AssessmentResponse(BaseModel):
     citizen_id: uuid.UUID
     scheme_id: uuid.UUID
     eligibility_result: bool
+    eligibility_status: Optional[str] = None
+    missing_facts: list[str] = []
+    missing_critical_facts: list[str] = []
     match_score: Optional[float] = None
     matched_rules: list[str] = []
     failed_rules: list[str] = []
@@ -70,6 +73,8 @@ class RecommendationItem(BaseModel):
     """Single item in a citizen's recommendations list."""
     scheme: SchemeResponse
     eligibility_result: bool
+    eligibility_status: Optional[str] = None
+    missing_critical_facts: list[str] = []
     is_stale: bool = False
     rule_match_score: Optional[float] = None
     match_score: Optional[float] = None
@@ -94,6 +99,8 @@ class RecommendationsResponse(BaseModel):
     total_schemes_evaluated: int
     eligible_count: int
     ineligible_count: int
+    information_needed_count: int = 0
     eligible_schemes: list[RecommendationItem]
     ineligible_schemes: list[RecommendationItem]
+    information_needed_schemes: list[RecommendationItem] = []
 

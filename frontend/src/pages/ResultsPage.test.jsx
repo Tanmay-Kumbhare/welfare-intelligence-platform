@@ -523,4 +523,62 @@ describe("ResultsPage Task 2 integration", () => {
       expect(screen.getByText("Previously Stored Scheme")).toBeInTheDocument();
     });
   });
+
+  it("renders information needed schemes in a dedicated section with missing critical facts", async () => {
+    const citizenId = "cit-tri-state";
+    api.citizenService.get.mockResolvedValue({
+      data: { citizen_id: citizenId, full_name: "Tri-State Citizen", citizen_type: "Student" },
+    });
+    api.eligibilityService.evaluate.mockResolvedValue({ data: [] });
+    api.recommendationService.getForCitizen.mockResolvedValue({
+      data: {
+        citizen_id: citizenId,
+        total_schemes_evaluated: 3,
+        eligible_count: 1,
+        ineligible_count: 1,
+        information_needed_count: 1,
+        eligible_schemes: [
+          {
+            scheme: { scheme_id: "sch-1", scheme_name: "Eligible Scheme", status: "ACTIVE" },
+            eligibility_result: true,
+            rule_match_score: 100.0,
+          },
+        ],
+        ineligible_schemes: [
+          {
+            scheme: { scheme_id: "sch-2", scheme_name: "Ineligible Scheme", status: "ACTIVE" },
+            eligibility_result: false,
+            rule_match_score: 25.0,
+          },
+        ],
+        information_needed_schemes: [
+          {
+            scheme: { scheme_id: "sch-3", scheme_name: "Scholarship with Income Cap", status: "ACTIVE" },
+            eligibility_result: false,
+            eligibility_status: "INSUFFICIENT_INFORMATION",
+            rule_match_score: 50.0,
+            reason: "Eligibility cannot be determined: missing information for annual_income.",
+            missing_critical_facts: ["annual_income"],
+          },
+        ],
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/results/${citizenId}`]}>
+        <Routes>
+          <Route path="/results/:citizenId" element={<ResultsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Scholarship with Income Cap")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("INFORMATION NEEDED")).toBeInTheDocument();
+    expect(screen.getByText("Information needed")).toBeInTheDocument();
+    expect(screen.getByText("annual income")).toBeInTheDocument();
+    expect(screen.getByText("Provide missing info")).toBeInTheDocument();
+  });
 });

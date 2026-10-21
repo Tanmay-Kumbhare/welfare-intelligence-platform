@@ -41,6 +41,7 @@ async def get_citizen_recommendations(
 
     eligible = []
     ineligible = []
+    information_needed = []
 
     ref_date = datetime.now(timezone.utc).date()
 
@@ -145,9 +146,21 @@ async def get_citizen_recommendations(
             eligibility_result=a.eligibility_result,
         )
 
+        status = a.eligibility_status or eval_details.get("eligibility_status")
+        if not status:
+            status = "ELIGIBLE" if a.eligibility_result else "NOT_ELIGIBLE"
+
+        missing_critical_facts = (
+            getattr(a, "missing_facts", None)
+            or eval_details.get("missing_critical_facts")
+            or []
+        )
+
         item = RecommendationItem(
             scheme=a.scheme,
             eligibility_result=a.eligibility_result,
+            eligibility_status=status,
+            missing_critical_facts=missing_critical_facts,
             is_stale=is_stale,
             rule_match_score=rule_match_score,
             match_score=float(match_score) if match_score is not None else None,
@@ -163,8 +176,10 @@ async def get_citizen_recommendations(
             scheme_documents=scheme_documents,
             gap_analysis=gap_analysis,
         )
-        if a.eligibility_result:
+        if status == "ELIGIBLE":
             eligible.append(item)
+        elif status == "INSUFFICIENT_INFORMATION":
+            information_needed.append(item)
         else:
             ineligible.append(item)
 
@@ -172,6 +187,7 @@ async def get_citizen_recommendations(
     from app.services.alternative_scheme_service import AlternativeSchemeService
 
     eligible_ranked = rank_recommendations(eligible, citizen=citizen)
+    information_needed_ranked = rank_recommendations(information_needed, citizen=citizen)
     ineligible_ranked = rank_recommendations(ineligible, citizen=citizen)
 
     # Attach alternative scheme suggestions to ineligible schemes
@@ -185,7 +201,9 @@ async def get_citizen_recommendations(
         total_schemes_evaluated=len(assessments),
         eligible_count=len(eligible_ranked),
         ineligible_count=len(ineligible_ranked),
+        information_needed_count=len(information_needed_ranked),
         eligible_schemes=eligible_ranked,
         ineligible_schemes=ineligible_ranked,
+        information_needed_schemes=information_needed_ranked,
     )
 

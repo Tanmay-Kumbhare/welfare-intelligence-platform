@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, HelpCircle, XCircle } from "lucide-react";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -253,11 +253,19 @@ export default function ResultsPage() {
 
   const eligible = data.eligible_schemes || [];
   const ineligible = data.ineligible_schemes || [];
-  const total = eligible.length + ineligible.length;
+  const informationNeeded = data.information_needed_schemes || [];
+  const total = data.total_schemes_evaluated ?? (eligible.length + ineligible.length + informationNeeded.length);
 
   return <div>
     <header className="border-b border-line pb-7 mb-8"><h1 className="text-[32px] leading-tight mb-3">Your eligibility results</h1><p className="max-w-[68ch] mb-3">These results are based on the eligibility rules currently stored for each evaluated scheme.</p>{citizen && <p className="text-sm mb-0">Results for <strong className="text-ink">{citizen.full_name}</strong> · {citizen.citizen_type}</p>}</header>
-    <Card className="mb-9"><div className="flex flex-wrap items-center gap-x-8 gap-y-3"><div><p className="font-mono text-xs text-ink-soft mb-1">EVALUATED</p><p className="text-2xl text-ink mb-0">{total} schemes</p></div><div><p className="font-mono text-xs text-ink-soft mb-1">ELIGIBLE</p><p className="text-2xl text-ok-ink mb-0">{eligible.length}</p></div><div><p className="font-mono text-xs text-ink-soft mb-1">NOT ELIGIBLE</p><p className="text-2xl text-excl-ink mb-0">{ineligible.length}</p></div></div></Card>
+    <Card className="mb-9">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div><p className="font-mono text-xs text-ink-soft mb-1">EVALUATED</p><p className="text-2xl text-ink mb-0">{total} schemes</p></div>
+        <div><p className="font-mono text-xs text-ink-soft mb-1">ELIGIBLE</p><p className="text-2xl text-ok-ink mb-0">{eligible.length}</p></div>
+        <div><p className="font-mono text-xs text-ink-soft mb-1">INFORMATION NEEDED</p><p className="text-2xl text-amber-600 mb-0">{informationNeeded.length}</p></div>
+        <div><p className="font-mono text-xs text-ink-soft mb-1">NOT ELIGIBLE</p><p className="text-2xl text-excl-ink mb-0">{ineligible.length}</p></div>
+      </div>
+    </Card>
 
     <div className="mb-6 p-3.5 bg-paper rounded border border-line text-xs text-ink-soft">
       <p className="mb-0 leading-relaxed font-sans">{SCORE_DISCLAIMER_TEXT}</p>
@@ -273,6 +281,68 @@ export default function ResultsPage() {
       <div className="flex items-center gap-2 border-b border-line pb-2.5 mb-4.5"><CheckCircle className="h-5 w-5 text-ok" aria-hidden="true" /><h2 id="eligible-heading" className="text-2xl mb-0">Eligible schemes <span className="font-sans text-sm font-normal text-ink-soft">({eligible.length})</span></h2></div>
       {eligible.length === 0 ? <EmptyState title="No evaluated schemes currently match..." message="No evaluated schemes currently match your information." /> : <div className="space-y-4">{eligible.map((item) => <Card key={item.scheme.scheme_id} eligible={!item.is_stale} className={item.is_stale ? "border-l-4 border-l-accent" : ""}><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2 mb-2"><h3 className="text-xl mb-0">{item.scheme.scheme_name}</h3><RuleMatchScoreIndicator score={item.rule_match_score} />{item.is_stale && <Badge variant="neutral" className="font-semibold">STALE</Badge>}</div><SchemeMeta scheme={item.scheme} /></div><Button to={`/schemes/${item.scheme.scheme_id}`} variant="secondary" size="sm">View scheme</Button></div>{item.is_stale ? <StaleEligibilityWarning /> : <p className="text-sm mt-4 mb-0">Your information meets the stored eligibility requirements.</p>}{(item.scheme.benefit_description || item.scheme.description) && <p className="text-sm mt-2 mb-0">{item.scheme.benefit_description || item.scheme.description}</p>}<RecommendationExplanation explanation={item.recommendation_explanation} />{item.gap_analysis && <GapAnalysisCard gapAnalysis={item.gap_analysis} className="mt-4" />}<SchemeDocuments item={item} /></Card>)}</div>}
     </section>
+
+    {informationNeeded.length > 0 && (
+      <section className="mb-10" aria-labelledby="info-needed-heading">
+        <div className="flex items-center gap-2 border-b border-line pb-2.5 mb-4.5">
+          <HelpCircle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+          <h2 id="info-needed-heading" className="text-2xl mb-0">
+            Information needed <span className="font-sans text-sm font-normal text-ink-soft">({informationNeeded.length})</span>
+          </h2>
+        </div>
+        <div className="space-y-4">
+          {informationNeeded.map((item) => (
+            <Card key={item.scheme.scheme_id} className="border-l-4 border-l-amber-500">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h3 className="text-xl mb-0">{item.scheme.scheme_name}</h3>
+                    <RuleMatchScoreIndicator score={item.rule_match_score} />
+                    <Badge variant="neutral" className="bg-amber-100 text-amber-800 border-amber-300 font-medium">
+                      Information Needed
+                    </Badge>
+                    {item.is_stale && <Badge variant="neutral" className="font-semibold">STALE</Badge>}
+                  </div>
+                  <SchemeMeta scheme={item.scheme} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button to="/check-eligibility" variant="primary" size="sm">
+                    Provide missing info
+                  </Button>
+                  <Button to={`/schemes/${item.scheme.scheme_id}`} variant="secondary" size="sm">
+                    View scheme
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-amber-50/70 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-800 text-xs">
+                <p className="font-medium text-amber-900 dark:text-amber-200 mb-1 flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                  Additional information required:
+                </p>
+                <p className="text-ink-soft mb-2">
+                  {item.reason || "We need additional details to confirm whether you qualify for this scheme."}
+                </p>
+                {item.missing_critical_facts && item.missing_critical_facts.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {item.missing_critical_facts.map((fact, idx) => (
+                      <Badge key={idx} variant="neutral" className="bg-paper border border-line text-xs font-mono">
+                        {fact.replace(/_/g, " ")}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {(item.scheme.benefit_description || item.scheme.description) && (
+                <p className="text-sm mt-3 mb-0">{item.scheme.benefit_description || item.scheme.description}</p>
+              )}
+              <RecommendationExplanation explanation={item.recommendation_explanation} />
+              {item.gap_analysis && <GapAnalysisCard gapAnalysis={item.gap_analysis} className="mt-4" />}
+              <SchemeDocuments item={item} />
+            </Card>
+          ))}
+        </div>
+      </section>
+    )}
 
     <section className="mb-10" aria-labelledby="excluded-heading">
       <div className="flex items-center gap-2 border-b border-line pb-2.5 mb-4.5"><XCircle className="h-5 w-5 text-excl" aria-hidden="true" /><h2 id="excluded-heading" className="text-2xl mb-0">Not currently eligible <span className="font-sans text-sm font-normal text-ink-soft">({ineligible.length})</span></h2></div>

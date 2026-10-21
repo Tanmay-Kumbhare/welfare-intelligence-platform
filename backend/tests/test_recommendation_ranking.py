@@ -17,6 +17,8 @@ def _make_item(
     rule_match_score: float | None = None,
     target_persona: str | None = None,
     document_status: str | None = None,
+    eligibility_status: str | None = None,
+    is_stale: bool = False,
 ) -> RecommendationItem:
     scheme_dict = {
         "scheme_id": scheme_id,
@@ -28,6 +30,8 @@ def _make_item(
     return RecommendationItem(
         scheme=SchemeResponse(**scheme_dict),
         eligibility_result=eligibility_result,
+        eligibility_status=eligibility_status,
+        is_stale=is_stale,
         rule_match_score=rule_match_score,
         assessment_date=date(2026, 1, 1),
         document_status=document_status,
@@ -189,3 +193,43 @@ def test_existing_eligibility_decisions_remain_unchanged():
     assert result is True
     assert details["overall_result"] is True
     assert details["rule_match_score"] == 100.0
+
+
+def test_insufficient_information_recommendation_explanation():
+    """Items with INSUFFICIENT_INFORMATION use dedicated explanation and are not marked not eligible."""
+    item = _make_item(
+        uuid.uuid4(),
+        "Partial Scheme",
+        eligibility_result=False,
+        eligibility_status="INSUFFICIENT_INFORMATION",
+        rule_match_score=50.0,
+    )
+    ranked = rank_recommendations([item])
+    assert "Information needed to confirm qualification" in ranked[0].recommendation_explanation
+    assert "Not currently eligible" not in ranked[0].recommendation_explanation
+
+
+def test_stale_and_eligible_recommendation_explanations_preserved():
+    """Verify stale assessments and eligible assessments retain their explanations."""
+    stale_item = _make_item(
+        uuid.uuid4(),
+        "Stale Scheme",
+        eligibility_result=True,
+        eligibility_status="INSUFFICIENT_INFORMATION",
+        is_stale=True,
+    )
+    eligible_item = _make_item(
+        uuid.uuid4(),
+        "Eligible Scheme",
+        eligibility_result=True,
+        eligibility_status="ELIGIBLE",
+    )
+    ranked = rank_recommendations([stale_item, eligible_item])
+
+    stale_ranked = next(r for r in ranked if r.scheme.scheme_name == "Stale Scheme")
+    assert "Scheme rules changed since your last evaluation. Re-evaluation recommended." in stale_ranked.recommendation_explanation
+    assert "Information needed to confirm qualification" not in stale_ranked.recommendation_explanation
+
+    eligible_ranked = next(r for r in ranked if r.scheme.scheme_name == "Eligible Scheme")
+    assert "Eligible based on profile criteria" in eligible_ranked.recommendation_explanation
+    assert "Not currently eligible" not in eligible_ranked.recommendation_explanation

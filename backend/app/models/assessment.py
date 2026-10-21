@@ -1,4 +1,4 @@
-﻿"""
+"""
 Eligibility Assessment ORM model.
 
 Table: tbl_eligibility_assessment
@@ -104,6 +104,14 @@ class EligibilityAssessment(Base):
 
     citizen: Mapped["CitizenMaster"] = relationship(back_populates="assessments")  # type: ignore[name-defined]
     scheme: Mapped["SchemeMaster"] = relationship(back_populates="assessments")  # type: ignore[name-defined]
+
+    @property
+    def missing_critical_facts(self) -> list[str]:
+        if self.missing_facts:
+            return list(self.missing_facts)
+        if self.evaluation_details and isinstance(self.evaluation_details, dict):
+            return self.evaluation_details.get("missing_critical_facts", [])
+        return []
 
     def __repr__(self) -> str:
         status = self.eligibility_status or ("ELIGIBLE" if self.eligibility_result else "INELIGIBLE")

@@ -105,18 +105,18 @@ class EligibilityEngine:
                 passed = self._apply_operator(actual_value, rule.operator, rule.required_value)
                 desc = rule.rule_description or rule.parameter_name
 
-                if passed:
+                if is_missing:
+                    missing_rules_count += 1
+                    desc_unknown = f"{desc} (Not provided)"
+                    unknown_rules.append(desc_unknown)
+                    status_str = "UNKNOWN"
+                    passed = False
+                elif passed:
                     passed_rules += 1
                     passed_rules_count += 1
                     passed_weight += rule_w
                     matched_rules.append(desc)
                     status_str = "PASS"
-                elif is_missing:
-                    missing_rules_count += 1
-                    desc_unknown = f"{desc} (Not provided)"
-                    unknown_rules.append(desc_unknown)
-                    failed_rules.append(desc_unknown)
-                    status_str = "UNKNOWN"
                 else:
                     failed_rules_count += 1
                     failed_rules.append(desc)
@@ -134,27 +134,94 @@ class EligibilityEngine:
                     "weight": rule_w,
                 })
 
-            if group.intra_group_operator.upper() == "AND":
-                group_passed = all(r["passed"] for r in rule_results) if rule_results else False
+            intra_op = group.intra_group_operator.upper()
+            if intra_op == "AND":
+                # Kleene AND:
+                # If ANY rule is FAIL -> FAIL
+                # If ALL rules are PASS -> PASS
+                # Otherwise -> UNKNOWN
+                if any(r["status"] == "FAIL" for r in rule_results):
+                    group_status = "FAIL"
+                    group_passed = False
+                elif all(r["status"] == "PASS" for r in rule_results) if rule_results else False:
+                    group_status = "PASS"
+                    group_passed = True
+                else:
+                    group_status = "UNKNOWN"
+                    group_passed = False
             else:  # OR
-                group_passed = any(r["passed"] for r in rule_results) if rule_results else False
+                # Kleene OR:
+                # If ANY rule is PASS -> PASS
+                # If ALL rules are FAIL -> FAIL
+                # Otherwise -> UNKNOWN
+                if any(r["status"] == "PASS" for r in rule_results):
+                    group_status = "PASS"
+                    group_passed = True
+                elif all(r["status"] == "FAIL" for r in rule_results) if rule_results else False:
+                    group_status = "FAIL"
+                    group_passed = False
+                else:
+                    group_status = "UNKNOWN"
+                    group_passed = False
 
-            if not group_passed:
+            if group_status == "FAIL":
                 for r in rule_results:
-                    if not r["passed"]:
+                    if r["status"] == "FAIL":
                         failed_mandatory_rules.append(r["description"] or r["parameter"])
 
             group_results.append({
                 "group_name": group.group_name,
                 "intra_group_operator": group.intra_group_operator,
                 "group_passed": group_passed,
+                "group_status": group_status,
                 "rules": rule_results,
             })
 
-        if scheme.group_combining_operator.upper() == "AND":
-            overall_result = all(g["group_passed"] for g in group_results) if (group_results and total_rules > 0) else False
+        combining_op = scheme.group_combining_operator.upper()
+        if not group_results or total_rules == 0:
+            scheme_status = "NOT_ELIGIBLE"
+            overall_result = False
+        elif combining_op == "AND":
+            # Kleene AND across groups:
+            # If ANY group is FAIL -> NOT_ELIGIBLE (decisive failure)
+            # If ALL groups are PASS -> ELIGIBLE
+            # Otherwise -> INSUFFICIENT_INFORMATION
+            if any(g["group_status"] == "FAIL" for g in group_results):
+                scheme_status = "NOT_ELIGIBLE"
+                overall_result = False
+            elif all(g["group_status"] == "PASS" for g in group_results):
+                scheme_status = "ELIGIBLE"
+                overall_result = True
+            else:
+                scheme_status = "INSUFFICIENT_INFORMATION"
+                overall_result = False
         else:  # OR
-            overall_result = any(g["group_passed"] for g in group_results) if (group_results and total_rules > 0) else False
+            # Kleene OR across groups:
+            # If ANY group is PASS -> ELIGIBLE (decisive pass)
+            # If ALL groups are FAIL -> NOT_ELIGIBLE
+            # Otherwise -> INSUFFICIENT_INFORMATION
+            if any(g["group_status"] == "PASS" for g in group_results):
+                scheme_status = "ELIGIBLE"
+                overall_result = True
+            elif all(g["group_status"] == "FAIL" for g in group_results):
+                scheme_status = "NOT_ELIGIBLE"
+                overall_result = False
+            else:
+                scheme_status = "INSUFFICIENT_INFORMATION"
+                overall_result = False
+
+        # Extract deterministic missing critical facts when INSUFFICIENT_INFORMATION
+        missing_critical_facts: list[str] = []
+        if scheme_status == "INSUFFICIENT_INFORMATION":
+            seen_facts = set()
+            for g in group_results:
+                if g["group_status"] == "UNKNOWN":
+                    for r in g["rules"]:
+                        if r["status"] == "UNKNOWN":
+                            param = r["parameter"]
+                            if param not in seen_facts:
+                                seen_facts.add(param)
+                                missing_critical_facts.append(param)
 
         # Rule Match Score calculation:
         # Range: 0.0 to 100.0 rounded to 1 decimal place.
@@ -174,6 +241,8 @@ class EligibilityEngine:
 
         evaluation_details = {
             "overall_result": overall_result,
+            "eligibility_status": scheme_status,
+            "missing_critical_facts": missing_critical_facts,
             "match_score": match_score,
             "total_rules": total_rules,
             "passed_rules": passed_rules,
@@ -191,13 +260,21 @@ class EligibilityEngine:
             "groups": group_results,
         }
 
-        if overall_result:
+        if scheme_status == "ELIGIBLE":
             reason = f"Citizen meets all criteria for {scheme.scheme_name}."
+        elif scheme_status == "INSUFFICIENT_INFORMATION":
+            if missing_critical_facts:
+                facts_display = ", ".join(missing_critical_facts)
+                reason = f"Eligibility cannot be determined: missing information for {facts_display}."
+            else:
+                reason = "Eligibility cannot be determined due to missing profile information."
         else:
             if failed_rules:
                 reason = f"Does not meet criteria: {', '.join(failed_rules)}"
-            else:
+            elif not group_results or total_rules == 0:
                 reason = f"No valid eligibility criteria defined for {scheme.scheme_name}."
+            else:
+                reason = f"Does not meet criteria for {scheme.scheme_name}."
 
         return overall_result, evaluation_details, reason
 

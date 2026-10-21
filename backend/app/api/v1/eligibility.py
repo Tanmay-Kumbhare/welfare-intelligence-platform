@@ -72,11 +72,19 @@ async def evaluate_citizen_eligibility(
             citizen, scheme, facts_dict=facts_dict
         )
         match_score = evaluation_details.get("match_score", 100.0)
+        eligibility_status = evaluation_details.get(
+            "eligibility_status", "ELIGIBLE" if overall_result else "NOT_ELIGIBLE"
+        )
+        missing_critical_facts = evaluation_details.get("missing_critical_facts", [])
+
         assessment_rows.append(
             {
                 "citizen_id": citizen.citizen_id,
                 "scheme_id": scheme.scheme_id,
                 "eligibility_result": overall_result,
+                "eligibility_status": eligibility_status,
+                "missing_facts": missing_critical_facts,
+                "missing_documents": [],
                 "confidence_score": round(match_score / 100.0, 3),
                 "reason": reason,
                 "evaluation_details": evaluation_details,

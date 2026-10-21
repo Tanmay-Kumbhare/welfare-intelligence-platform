@@ -28,15 +28,30 @@ class AssessmentRepository:
         eligibility_result: bool,
         reason: str | None,
         evaluation_details: dict[str, Any],
+        eligibility_status: str | None = None,
+        missing_facts: list[str] | None = None,
+        missing_documents: list[str] | None = None,
+        confidence_score: float | None = None,
     ) -> EligibilityAssessment:
         """
         Create or update an assessment for a citizen-scheme pair.
         Uses PostgreSQL ON CONFLICT DO UPDATE.
         """
+        if eligibility_status is None:
+            eligibility_status = evaluation_details.get(
+                "eligibility_status", "ELIGIBLE" if eligibility_result else "NOT_ELIGIBLE"
+            )
+        if missing_facts is None:
+            missing_facts = evaluation_details.get("missing_critical_facts", [])
+
         stmt = insert(EligibilityAssessment).values(
             citizen_id=citizen_id,
             scheme_id=scheme_id,
             eligibility_result=eligibility_result,
+            eligibility_status=eligibility_status,
+            missing_facts=missing_facts,
+            missing_documents=missing_documents or [],
+            confidence_score=confidence_score,
             reason=reason,
             evaluation_details=evaluation_details,
         )
@@ -46,6 +61,10 @@ class AssessmentRepository:
             constraint="uq_citizen_scheme_assessment",
             set_={
                 "eligibility_result": stmt.excluded.eligibility_result,
+                "eligibility_status": stmt.excluded.eligibility_status,
+                "missing_facts": stmt.excluded.missing_facts,
+                "missing_documents": stmt.excluded.missing_documents,
+                "confidence_score": stmt.excluded.confidence_score,
                 "reason": stmt.excluded.reason,
                 "evaluation_details": stmt.excluded.evaluation_details,
                 "assessment_date": stmt.excluded.assessment_date,
@@ -79,6 +98,9 @@ class AssessmentRepository:
             constraint="uq_citizen_scheme_assessment",
             set_={
                 "eligibility_result": stmt.excluded.eligibility_result,
+                "eligibility_status": stmt.excluded.eligibility_status,
+                "missing_facts": stmt.excluded.missing_facts,
+                "missing_documents": stmt.excluded.missing_documents,
                 "confidence_score": stmt.excluded.confidence_score,
                 "reason": stmt.excluded.reason,
                 "evaluation_details": stmt.excluded.evaluation_details,

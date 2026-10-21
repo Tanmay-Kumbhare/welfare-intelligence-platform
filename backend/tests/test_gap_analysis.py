@@ -328,3 +328,87 @@ def test_existing_eligibility_decisions_remain_unchanged():
     # Gap analysis on this eligible result should show no gaps
     gap_result = GapAnalysisService.analyze_gaps(evaluation_details=details, eligibility_result=result)
     assert gap_result.has_gaps is False
+
+
+def test_gap_analysis_all_mandatory_documents_satisfied():
+    """All mandatory scheme documents satisfied with VALID status results in has_gaps=False."""
+    eval_details = {
+        "overall_result": True,
+        "rule_match_score": 100.0,
+        "groups": [
+            {
+                "group_name": "Criteria",
+                "rules": [
+                    {
+                        "parameter": "citizen_type",
+                        "actual": "FARMER",
+                        "required": "FARMER",
+                        "operator": "==",
+                        "passed": True,
+                        "is_missing": False,
+                    }
+                ],
+            }
+        ],
+    }
+    scheme_docs = [
+        {"document_type": "AADHAAR", "name": "Aadhaar Card", "required": True, "status": "VALID"},
+        {"document_type": "BANK_PASSBOOK", "name": "Bank Passbook", "required": True, "status": "VALID"},
+        {"document_type": "INCOME_CERTIFICATE", "name": "Income Certificate", "required": False, "status": "MISSING"},
+    ]
+
+    analysis = GapAnalysisService.analyze_gaps(
+        evaluation_details=eval_details,
+        scheme_documents=scheme_docs,
+        eligibility_result=True,
+    )
+
+    assert analysis.has_gaps is False
+    assert len(analysis.missing_documents) == 0
+    assert "All eligibility criteria and required documents are satisfied" in analysis.summary_message
+
+
+def test_gap_analysis_unsatisfied_document_statuses_and_messages():
+    """Unsatisfied documents with various statuses (MISSING, INVALID, REVIEW_REQUIRED, PENDING) are structured properly."""
+    eval_details = {
+        "overall_result": True,
+        "rule_match_score": 100.0,
+        "groups": [
+            {
+                "group_name": "Criteria",
+                "rules": [
+                    {
+                        "parameter": "age",
+                        "actual": 30,
+                        "required": "18",
+                        "operator": ">=",
+                        "passed": True,
+                        "is_missing": False,
+                    }
+                ],
+            }
+        ],
+    }
+    scheme_docs = [
+        {"document_type": "AADHAAR", "name": "Aadhaar Card", "required": True, "status": "MISSING"},
+        {"document_type": "BANK_PASSBOOK", "name": "Bank Passbook", "required": True, "status": "INVALID"},
+        {"document_type": "MARKSHEET", "name": "Marksheet", "required": True, "status": "REVIEW_REQUIRED"},
+        {"document_type": "DOMICILE_CERTIFICATE", "name": "Domicile Certificate", "required": True, "status": "PENDING"},
+        {"document_type": "PHOTOGRAPH", "name": "Photograph", "required": False, "status": "MISSING"},
+    ]
+
+    analysis = GapAnalysisService.analyze_gaps(
+        evaluation_details=eval_details,
+        scheme_documents=scheme_docs,
+        eligibility_result=True,
+    )
+
+    assert analysis.has_gaps is True
+    assert len(analysis.missing_documents) == 4
+
+    missing_map = {d.document_type: d for d in analysis.missing_documents}
+    assert missing_map["AADHAAR"].message == "Aadhaar Card has not been uploaded."
+    assert missing_map["BANK_PASSBOOK"].message == "Uploaded Bank Passbook is invalid or incorrect document type."
+    assert missing_map["MARKSHEET"].message == "Uploaded Marksheet requires verification review."
+    assert missing_map["DOMICILE_CERTIFICATE"].message == "Domicile Certificate is pending validation (status: PENDING)."
+    assert "PHOTOGRAPH" not in missing_map

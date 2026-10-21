@@ -117,6 +117,7 @@ export default function ResultsPage() {
   const [data, setData] = useState(null);
   const [citizen, setCitizen] = useState(null);
   const [status, setStatus] = useState("loading");
+  const [incompleteProfile, setIncompleteProfile] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -136,12 +137,19 @@ export default function ResultsPage() {
     eligibilityService.evaluate(citizenId)
       .catch((error) => {
         // A failed evaluation must not block showing previously stored
-        // results — but a 404 means the citizen itself is gone.
+        // results — but a 404 means the citizen itself is gone, and a 422
+        // means the profile is incomplete and cannot be evaluated.
         if (error?.response?.status === 404) {
           setStatus("not-found");
           throw { handled: true };
         }
-        return null; // tolerate: fall through to stored recommendations
+        if (error?.response?.status === 422) {
+          const detail = error.response.data?.detail || error.response.data || {};
+          setIncompleteProfile(detail);
+          setStatus("incomplete-profile");
+          throw { handled: true };
+        }
+        return null; // tolerate other errors: fall through to stored recommendations
       })
       .then(() => (cancelled ? null : recommendationService.getForCitizen(citizenId)))
       .then((response) => {
@@ -170,6 +178,76 @@ export default function ResultsPage() {
   if (!citizenId) return <ErrorState title="Missing citizen ID" message="We need a citizen profile ID to load eligibility results." />;
   if (status === "loading") return <LoadingState label="Loading eligibility results..." />;
   if (status === "not-found") return <ErrorState title="Citizen not found" message="No citizen profile exists for this evaluation result." onRetry={() => setReloadKey((value) => value + 1)} />;
+  if (status === "incomplete-profile") {
+    const missingLabels = incompleteProfile?.missing_field_labels || incompleteProfile?.missing_fields || [];
+    const message = incompleteProfile?.message || "Your citizen profile is incomplete. Please complete all required profile fields before running eligibility evaluation.";
+    const completionRate = incompleteProfile?.profile_completion || 0;
+
+    return (
+      <div className="max-w-2xl mx-auto py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-ink mb-1">Profile Incomplete</h1>
+          <p className="text-ink-soft text-sm">
+            {message}
+          </p>
+        </div>
+
+        <Card className="p-6 border-l-4 border-l-amber-500">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
+              <div>
+                <h2 className="text-lg font-semibold text-ink">Evaluation Paused: Missing Information</h2>
+                <p className="text-xs text-ink-soft">
+                  The eligibility engine requires the following mandatory profile fields to accurately determine scheme qualifications.
+                </p>
+              </div>
+            </div>
+
+            {completionRate > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-ink font-semibold">Profile Completion</span>
+                  <span className="text-amber-700 font-bold">{completionRate}%</span>
+                </div>
+                <div className="w-full bg-line/80 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                    style={{ width: `${Math.min(Math.max(completionRate, 0), 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {missingLabels.length > 0 && (
+              <div className="bg-surface-soft p-4 rounded-lg border border-line space-y-2">
+                <p className="text-xs font-semibold text-ink-soft uppercase tracking-wider">
+                  Missing Required Fields:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {missingLabels.map((field, idx) => (
+                    <Badge key={idx} variant="excl" className="flex items-center gap-1.5 py-1 px-2.5">
+                      <AlertTriangle className="h-3 w-3 text-excl shrink-0" />
+                      <span>{field}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex flex-wrap items-center gap-3">
+              <Button to="/check-eligibility" variant="primary" size="md">
+                Complete Profile Questionnaire
+              </Button>
+              <Button to="/profile" variant="secondary" size="md">
+                View Profile Details
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
   if (status === "error") return <ErrorState title="Unable to load your eligibility results." message="The backend recommendation service could not be loaded. Please try again." onRetry={() => setReloadKey((value) => value + 1)} />;
   if (!data) return <EmptyState title="No evaluated schemes currently match..." message="The backend returned no eligibility results for this citizen." />;
 

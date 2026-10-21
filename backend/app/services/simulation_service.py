@@ -41,11 +41,14 @@ class SimulationEligibilityEngine(EligibilityEngine):
     falling back to the citizen's real profile attributes and profile facts.
     """
 
-    def __init__(self, overrides: Dict[str, Any]):
+    def __init__(self, overrides: Dict[str, Any], facts_dict: Optional[Dict[str, Any]] = None):
         super().__init__()
         self.overrides = {k: v for k, v in overrides.items() if v is not None}
+        self.facts_dict = facts_dict
 
-    def _resolve_parameter(self, citizen: CitizenMaster, parameter_name: str) -> Any:
+    def _resolve_parameter(
+        self, citizen: CitizenMaster, parameter_name: str, facts_dict: dict[str, Any] | None = None
+    ) -> Any:
         if parameter_name in self.overrides:
             val = self.overrides[parameter_name]
             # Special normalization conversions for standard parameters
@@ -64,7 +67,8 @@ class SimulationEligibilityEngine(EligibilityEngine):
             return val
 
         # Fallback to standard engine parameter resolution
-        return super()._resolve_parameter(citizen, parameter_name)
+        effective_facts = facts_dict if facts_dict is not None else self.facts_dict
+        return super()._resolve_parameter(citizen, parameter_name, facts_dict=effective_facts)
 
 
 class SimulationService:
@@ -76,6 +80,7 @@ class SimulationService:
         schemes: Sequence[SchemeMaster],
         simulation_input: SimulationInput,
         baseline_assessments_map: Optional[Dict[uuid.UUID, Tuple[bool, Dict[str, Any], str]]] = None,
+        facts_dict: Optional[Dict[str, Any]] = None,
     ) -> SimulationResponse:
         """
         Simulate eligibility for all active schemes under hypothetical inputs.
@@ -86,11 +91,20 @@ class SimulationService:
             simulation_input: Hypothetical profile changes.
             baseline_assessments_map: Optional pre-computed baseline (scheme_id -> (result, details, reason)).
                                       If not provided, baseline is evaluated in-memory using standard engine.
+            facts_dict: Optional active profile facts mapping {fact_code: fact_value}.
+                        If not provided but citizen has loaded profile_facts, they are extracted.
         """
+        if facts_dict is None and getattr(citizen, "profile_facts", None):
+            facts_dict = {
+                f.fact_code: f.fact_value
+                for f in citizen.profile_facts
+                if getattr(f, "effective_until", None) is None
+            }
+
         raw_overrides = simulation_input.model_dump(exclude_unset=True, exclude_none=True)
 
         standard_engine = EligibilityEngine()
-        sim_engine = SimulationEligibilityEngine(raw_overrides)
+        sim_engine = SimulationEligibilityEngine(raw_overrides, facts_dict=facts_dict)
 
         simulated_schemes: List[SchemeSimulationResult] = []
         newly_eligible_count = 0
@@ -106,12 +120,12 @@ class SimulationService:
                 base_eligible, base_details, base_reason = baseline_assessments_map[scheme_id]
             else:
                 base_eligible, base_details, base_reason = standard_engine.evaluate_scheme(
-                    citizen, scheme
+                    citizen, scheme, facts_dict=facts_dict
                 )
 
             # 2. Simulated evaluation
             sim_eligible, sim_details, sim_reason = sim_engine.evaluate_scheme(
-                citizen, scheme
+                citizen, scheme, facts_dict=facts_dict
             )
 
             base_score = (

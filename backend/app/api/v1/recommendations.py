@@ -35,10 +35,9 @@ async def get_citizen_recommendations(
     assessment_repo = AssessmentRepository(db)
     assessments = await assessment_repo.get_citizen_assessments(citizen_id, active_only=True)
 
-    from app.services.document_service import DocumentService
+    from app.services.document_service import DocumentService, find_matching_citizen_document
     doc_service = DocumentService(db)
     citizen_docs = await doc_service.get_citizen_documents(citizen_id)
-    citizen_doc_map = {d.requirement_type: d for d in citizen_docs}
 
     eligible = []
     ineligible = []
@@ -81,7 +80,7 @@ async def get_citizen_recommendations(
         is_complete = True
         
         for req in a.scheme.documents:
-            c_doc = citizen_doc_map.get(req.document_type)
+            c_doc = find_matching_citizen_document(req.document_type, citizen_docs)
             
             if not c_doc:
                 status = "MISSING"
